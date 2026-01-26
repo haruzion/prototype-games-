@@ -94,7 +94,13 @@ function createGameCard(game) {
     // Add click handler
     card.addEventListener('click', () => {
         if (game.url) {
-            window.location.href = game.url;
+            // Validate that the URL is relative (starts with ./ or games/)
+            // This prevents external URL redirects for security
+            if (game.url.startsWith('./') || game.url.startsWith('games/')) {
+                window.location.href = game.url;
+            } else {
+                console.warn('Invalid game URL format:', game.url);
+            }
         }
     });
     
