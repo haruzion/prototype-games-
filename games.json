@@ -8,6 +8,15 @@
       "image": "",
       "url": "games/sample-game/index.html",
       "tags": ["アクション", "シングルプレイ"]
+    },
+    {
+      "id": "pokemon-nazonazo",
+      "title": "ポケモンなぞなぞ",
+      "description": "ポケモンのなぞなぞに挑戦！人気のポケモンたちの特徴を覚えて、4択クイズに答えよう。タイムアタックモードやポケモンずかんコンプリート機能も搭載！",
+      "icon": "🎮",
+      "image": "",
+      "url": "games/pokemon-nazonazo/index.html",
+      "tags": ["クイズ", "シングルプレイ", "ポケモン"]
     }
   ]
 }
