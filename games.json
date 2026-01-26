@@ -1,0 +1,13 @@
+{
+  "games": [
+    {
+      "id": "sample-game",
+      "title": "サンプルゲーム",
+      "description": "これはサンプルゲームの説明文です。ここにゲームの特徴や遊び方を簡潔に記載します。",
+      "icon": "🎯",
+      "image": "",
+      "url": "games/sample-game/index.html",
+      "tags": ["アクション", "シングルプレイ"]
+    }
+  ]
+}
