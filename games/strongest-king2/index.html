@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>最強王図鑑バトル - 拡張版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+        
+        body {
+            font-family: 'DotGothic16', sans-serif;
+            background-color: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .battle-container {
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            background: #1e293b;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        /* Field Background */
+        .field-bg {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .enemy-field {
+            flex: 1.2;
+            background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
+            position: relative;
+        }
+        
+        .player-field {
+            flex: 0.8;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Weather Overlay */
+        #weather-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+            transition: all 1s ease;
+        }
+
+        /* HP Bar */
+        .hp-bar-bg {
+            width: 100%;
+            height: 10px;
+            background-color: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #4ade80);
+            transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .hp-bar-fill.warning { background: linear-gradient(90deg, #eab308, #fde047); }
+        .hp-bar-fill.danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        /* Status Window */
+        .status-window {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 12px;
+            padding: 8px;
+            width: 200px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 40;
+        }
+        .status-window.small {
+            width: 180px;
+            padding: 6px;
+        }
+
+        /* Log */
+        .log-box {
+            height: 90px;
+            background-color: rgba(15, 23, 42, 0.9);
+            color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px;
+            overflow-y: auto;
+            font-size: 14px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            line-height: 1.6;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Monsters */
+        .monster {
+            position: absolute;
+            font-size: 90px;
+            transition: all 0.3s;
+            z-index: 5;
+            filter: drop-shadow(0 15px 15px rgba(0,0,0,0.6));
+        }
+        .enemy-pos { top: 22%; right: 12%; }
+        .enemy-pos-2 { top: 22%; right: 40%; }
+        .player-pos { bottom: 12%; left: 12%; }
+        .player-pos-2 { bottom: 12%; left: 40%; }
+
+        /* Buttons */
+        .action-button {
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.2s;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 10px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            color: white;
+            text-align: left;
+        }
+        .action-button:active:not(:disabled) {
+            transform: scale(0.95);
+            background: rgba(255,255,255,0.1);
+        }
+        .action-button:disabled {
+            background-color: rgba(255,255,255,0.02) !important;
+            color: #475569 !important;
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: transparent;
+        }
+        .special-move-btn {
+            background: linear-gradient(135deg, rgba(254,240,138,0.1), rgba(254,240,138,0.2));
+            border: 1px solid rgba(234,179,8,0.5);
+        }
+
+        .screen {
+            position: absolute;
+            inset: 0;
+            background-color: #0f172a;
+            z-index: 100;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+        .hidden-screen { display: none !important; }
+
+        .shake { animation: shake 0.4s ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        .weather-banner {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 4px 18px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 12px;
+            color: white;
+            z-index: 50;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        #sound-toggle {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 110;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(4px);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .difficulty-btn {
+            width: 100%;
+            padding: 24px;
+            margin-bottom: 16px;
+            border-radius: 20px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: white;
+            transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .difficulty-btn:active { transform: scale(0.98); }
+
+        .vs-badge {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40px;
+            font-style: italic;
+            font-weight: 900;
+            color: rgba(255,255,255,0.1);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Modal for confirm */
+        .modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 200;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-content {
+            background: #1e293b;
+            border: 2px solid #334155;
+            padding: 24px;
+            border-radius: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        /* Tournament Bracket */
+        .tournament-bracket {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 320px;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.98);
+            backdrop-filter: blur(10px);
+            border-left: 2px solid rgba(255,255,255,0.1);
+            z-index: 150;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .tournament-bracket.open {
+            right: 0;
+        }
+        .bracket-toggle {
+            position: fixed;
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+            background: rgba(99, 102, 241, 0.9);
+            backdrop-filter: blur(4px);
+            color: white;
+            padding: 12px 8px;
+            border-radius: 8px 0 0 8px;
+            z-index: 140;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            writing-mode: vertical-rl;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.2s;
+        }
+        .bracket-toggle:hover {
+            background: rgba(99, 102, 241, 1);
+            padding-right: 12px;
+        }
+        .bracket-match {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+        .bracket-fighter {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px;
+            border-radius: 6px;
+            margin: 2px 0;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .bracket-fighter.player-side {
+            background: rgba(59, 130, 246, 0.2);
+        }
+        .bracket-fighter.enemy-side {
+            background: rgba(239, 68, 68, 0.2);
+        }
+        .bracket-fighter.winner {
+            background: rgba(34, 197, 94, 0.3);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+        }
+        .bracket-fighter.loser {
+            opacity: 0.4;
+            text-decoration: line-through;
+        }
+        .bracket-fighter.current {
+            border: 2px solid rgba(234, 179, 8, 0.8);
+            box-shadow: 0 0 10px rgba(234, 179, 8, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div class="battle-container">
+    <div id="flash-overlay" class="absolute inset-0 bg-white opacity-0 pointer-events-none z-[100] transition-opacity duration-100"></div>
+    <div id="event-overlay" class="absolute inset-0 flex items-center justify-center z-[80] pointer-events-none text-4xl font-extrabold text-white text-shadow-lg text-center px-4 hidden"></div>
+    <button id="sound-toggle" onclick="toggleSound()">🔇</button>
+    
+    <!-- Tournament Bracket -->
+    <div class="bracket-toggle" onclick="toggleBracket()">トーナメント表</div>
+    <div id="tournament-bracket" class="tournament-bracket">
+        <div class="flex justify-between items-center mb-4 sticky top-0 bg-slate-900/95 backdrop-blur-md py-2 z-10 rounded-lg">
+            <h3 class="text-white font-bold text-sm">📋 対戦表</h3>
+            <button onclick="toggleBracket()" class="text-slate-400 text-xl leading-none hover:text-white">×</button>
+        </div>
+        <div id="bracket-content" class="space-y-2"></div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="quit-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <p class="text-white mb-6 text-lg font-bold">タイトルに戻りますか？<br><span class="text-xs text-rose-400 font-normal">※進行度は失われます</span></p>
+            <div class="flex gap-4">
+                <button onclick="closeQuitModal()" class="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold">いいえ</button>
+                <button onclick="backToTitle()" class="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold">はい</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. Mode Selection -->
+    <div id="mode-screen" class="screen">
+        <h2 class="text-4xl font-black mb-12 text-white text-center mt-12 tracking-wider">最強王 BATTLE</h2>
+        <div class="flex flex-col gap-3 w-full max-w-sm mx-auto">
+            <button onclick="selectMode('single')" class="difficulty-btn bg-indigo-600 shadow-lg shadow-indigo-900/20">
+                <span class="block">シングルバトル</span>
+                <span class="text-[10px] font-normal opacity-80 italic">1 vs 1 Battle</span>
+            </button>
+            <button onclick="selectMode('tag')" class="difficulty-btn bg-purple-600 shadow-lg shadow-purple-900/20">
+                <span class="block">タッグバトル</span>
+                <span class="text-[10px] font-normal opacity-80 italic">2 vs 2 Battle</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. Difficulty Screen -->
+    <div id="difficulty-screen" class="screen hidden-screen">
+        <h2 class="text-3xl font-black mb-8 text-white text-center mt-8 tracking-wider">難易度選択</h2>
+        <div class="flex flex-col gap-2 w-full max-w-sm mx-auto">
+            <button onclick="selectDifficulty('easy')" class="difficulty-btn bg-emerald-600 shadow-lg shadow-emerald-900/20">
+                <span class="block">やさしい</span>
+                <span class="text-[10px] font-normal opacity-80 italic">Beginner Mode</span>
+            </button>
+            <button onclick="selectDifficulty('normal')" class="difficulty-btn bg-sky-600 shadow-lg shadow-sky-900/20">
+                <span class="block">ふつう</span>
+                <span class="text-[10px] font-normal opacity-80 italic">Normal Challenge</span>
+            </button>
+            <button onclick="selectDifficulty('hard')" class="difficulty-btn bg-rose-700 shadow-lg shadow-rose-900/20">
+                <span class="block">むずかしい</span>
+                <span class="text-[10px] font-normal opacity-80 italic">Master Road</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. Character Selection -->
+    <div id="selection-screen" class="screen hidden-screen overflow-y-auto">
+        <div class="flex justify-between items-center mb-6 sticky top-0 bg-slate-900/80 backdrop-blur-md py-2 z-10 rounded-b-xl px-2">
+            <h2 class="text-xl font-bold text-white" id="selection-title">パートナー選択</h2>
+            <button onclick="backToDifficulty()" class="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-full">戻る</button>
+        </div>
+        <div id="selection-grid" class="space-y-4 pb-12"></div>
+    </div>
+
+    <!-- 4. Battle Screen -->
+    <div id="battle-screen" class="flex-grow relative overflow-hidden hidden-screen">
+        <div class="absolute top-4 left-4 flex gap-2 z-50">
+            <div id="tournament-info" class="bg-white/10 backdrop-blur-md border border-white/20 text-white px-4 py-1.5 font-bold text-xs rounded-full">1 / 7 回戦</div>
+            <button onclick="showQuitModal()" class="bg-rose-900/40 backdrop-blur-md border border-rose-500/30 text-rose-200 px-4 py-1.5 font-bold text-xs rounded-full">リタイア</button>
+        </div>
+        
+        <div id="weather-overlay"></div>
+        <div id="weather-banner" class="weather-banner"></div>
+        <div class="vs-badge">VS</div>
+        
+        <div class="field-bg">
+            <div class="enemy-field"></div>
+            <div class="player-field"></div>
+        </div>
+
+        <!-- Enemy Status 1 -->
+        <div id="enemy-status-1" class="absolute top-16 left-6 status-window small">
+            <div class="flex justify-between items-center mb-1">
+                <span id="enemy-name-display" class="font-bold text-slate-900 text-xs"></span>
+                <span id="enemy-type-display" class="text-[8px] bg-slate-800 text-white px-1.5 py-0.5 rounded font-bold"></span>
+            </div>
+            <div class="hp-bar-bg"><div id="enemy-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
+            <div class="flex justify-between mt-1 text-[9px] font-bold text-slate-600">
+                <span id="enemy-item-display"></span>
+                <span id="enemy-hp-text"></span>
+            </div>
+        </div>
+        
+        <!-- Enemy Status 2 (Tag Battle) -->
+        <div id="enemy-status-2" class="absolute top-16 right-6 status-window small hidden">
+            <div class="flex justify-between items-center mb-1">
+                <span id="enemy2-name-display" class="font-bold text-slate-900 text-xs"></span>
+                <span id="enemy2-type-display" class="text-[8px] bg-slate-800 text-white px-1.5 py-0.5 rounded font-bold"></span>
+            </div>
+            <div class="hp-bar-bg"><div id="enemy2-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
+            <div class="flex justify-between mt-1 text-[9px] font-bold text-slate-600">
+                <span id="enemy2-item-display"></span>
+                <span id="enemy2-hp-text"></span>
+            </div>
+        </div>
+        
+        <!-- Player Status 1 -->
+        <div id="player-status-1" class="absolute bottom-12 right-6 status-window small">
+            <div class="flex justify-between items-center mb-1">
+                <span id="player-name-display" class="font-bold text-slate-900 text-xs"></span>
+                <span id="player-type-display" class="text-[8px] bg-slate-800 text-white px-1.5 py-0.5 rounded font-bold"></span>
+            </div>
+            <div class="hp-bar-bg"><div id="player-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
+            <div class="flex justify-between mt-1 text-[9px] font-bold text-slate-600">
+                <span id="player-item-display"></span>
+                <span id="player-hp-text"></span>
+            </div>
+        </div>
+        
+        <!-- Player Status 2 (Tag Battle) -->
+        <div id="player-status-2" class="absolute bottom-12 left-6 status-window small hidden">
+            <div class="flex justify-between items-center mb-1">
+                <span id="player2-name-display" class="font-bold text-slate-900 text-xs"></span>
+                <span id="player2-type-display" class="text-[8px] bg-slate-800 text-white px-1.5 py-0.5 rounded font-bold"></span>
+            </div>
+            <div class="hp-bar-bg"><div id="player2-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
+            <div class="flex justify-between mt-1 text-[9px] font-bold text-slate-600">
+                <span id="player2-item-display"></span>
+                <span id="player2-hp-text"></span>
+            </div>
+        </div>
+
+        <div id="enemy-sprite" class="monster enemy-pos"></div>
+        <div id="enemy2-sprite" class="monster enemy-pos-2 hidden"></div>
+        <div id="player-sprite" class="monster player-pos"></div>
+        <div id="player2-sprite" class="monster player-pos-2 hidden"></div>
+    </div>
+
+    <!-- 4. UI Panel -->
+    <div id="ui-box" class="h-[42%] bg-slate-900 border-t border-white/10 p-4 flex flex-col z-50 hidden-screen">
+        <div id="log" class="log-box"></div>
+        <div id="controls" class="grid grid-cols-2 gap-3 overflow-y-auto"></div>
+        <div id="restart-ctrl" class="hidden flex-grow flex items-center">
+            <button onclick="location.reload()" class="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl text-lg shadow-xl shadow-indigo-900/40">タイトルへ戻る</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Audio System ---
+    const sound = {
+        ctx: null, isMuted: true, bgmNode: null, bgmType: null,
+        init() { 
+            if (this.ctx) return;
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)(); 
+            this.isMuted = false; 
+            document.getElementById('sound-toggle').textContent = '🔊';
+        },
+        toggleMute() { 
+            if (this.isMuted) {
+                if (!this.ctx) this.init();
+                this.isMuted = false;
+                if(this.ctx.state === 'suspended') this.ctx.resume();
+                document.getElementById('sound-toggle').textContent = '🔊';
+                if (!this.bgmNode && this.bgmType) this.playBgm(this.bgmType);
+            } else {
+                this.isMuted = true;
+                if(this.ctx) this.ctx.suspend();
+                document.getElementById('sound-toggle').textContent = '🔇';
+            }
+        },
+        playContextualBgm() {
+            if (player && enemy && round < opponents.length) {
+                this.playBgm('battle');
+            } else if (document.getElementById('selection-screen').offsetParent !== null) {
+                this.playBgm('select');
+            }
+        },
+        playSe(type) {
+            if (this.isMuted || !this.ctx) return;
+            const t = this.ctx.currentTime; const osc = this.ctx.createOscillator(); const g = this.ctx.createGain();
+            osc.connect(g); g.connect(this.ctx.destination);
+            if (type === 'attack') { 
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(40, t+0.1);
+                g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.1); osc.start(t); osc.stop(t + 0.1); 
+            } else if (type === 'special') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(400, t); osc.frequency.exponentialRampToValueAtTime(50, t+0.3);
+                g.gain.setValueAtTime(0.1, t); g.gain.linearRampToValueAtTime(0, t + 0.3); osc.start(t); osc.stop(t + 0.3);
+            } else if (type === 'damage') { 
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(80, t); g.gain.setValueAtTime(0.3, t); g.gain.linearRampToValueAtTime(0, t + 0.2); osc.start(t); osc.stop(t + 0.2); 
+            } else if (type === 'heal') { 
+                osc.type = 'sine'; osc.frequency.setValueAtTime(500, t); osc.frequency.linearRampToValueAtTime(1000, t + 0.4); g.gain.setValueAtTime(0.1, t); g.gain.linearRampToValueAtTime(0, t + 0.4); osc.start(t); osc.stop(t + 0.4); 
+            } else if (type === 'select') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(880, t); g.gain.setValueAtTime(0.05, t); g.gain.linearRampToValueAtTime(0, t + 0.05); osc.start(t); osc.stop(t + 0.05);
+            } else if (type === 'event') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(200, t); osc.frequency.linearRampToValueAtTime(800, t + 0.5); g.gain.setValueAtTime(0.1, t); g.gain.linearRampToValueAtTime(0, t + 0.5); osc.start(t); osc.stop(t + 0.5);
+            }
+        },
+        playBgm(type) {
+            if (this.isMuted || !this.ctx) {
+                this.bgmType = type;
+                return;
+            }
+            if (this.bgmNode) {
+                this.bgmNode.onended = null;
+                this.bgmNode.stop();
+                this.bgmNode = null;
+            }
+            this.bgmType = type;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.connect(g); g.connect(this.ctx.destination);
+            
+            let duration = 0;
+            if (type === 'battle') {
+                g.gain.setValueAtTime(0.02, t);
+                osc.type = 'triangle';
+                const notes = [110, 110, 123, 110, 130, 110, 146, 110];
+                let now = t;
+                for(let i=0; i<32; i++) {
+                    osc.frequency.setValueAtTime(notes[i % notes.length], now);
+                    now += 0.2;
+                }
+                duration = 32 * 0.2;
+                osc.start(t); osc.stop(t + duration);
+                this.bgmNode = osc;
+                osc.onended = () => { if(this.bgmType === 'battle') this.playBgm('battle'); };
+            } else if (type === 'select') {
+                g.gain.setValueAtTime(0.015, t);
+                osc.type = 'sine';
+                const notes = [440, 493, 523, 587];
+                let now = t;
+                for(let i=0; i<8; i++) {
+                    osc.frequency.setValueAtTime(notes[i % notes.length], now);
+                    now += 1.0;
+                }
+                duration = 8 * 1.0;
+                osc.start(t); osc.stop(t + duration);
+                this.bgmNode = osc;
+                osc.onended = () => { if(this.bgmType === 'select') this.playBgm('select'); };
+            } else if (type === 'win') {
+                g.gain.setValueAtTime(0.05, t);
+                osc.type = 'square';
+                const winNotes = [523, 523, 523, 523, 659, 783, 1046, 1046, 1046];
+                let now = t;
+                winNotes.forEach(n => {
+                    osc.frequency.setValueAtTime(n, now);
+                    now += 0.15;
+                });
+                osc.start(t); osc.stop(now);
+                this.bgmNode = osc;
+            } else if (type === 'fanfare') {
+                g.gain.setValueAtTime(0.1, t);
+                osc.type = 'sawtooth';
+                const fNotes = [523, 523, 523, 523, 698, 783, 880, 932, 1046];
+                let now = t;
+                fNotes.forEach((n, i) => {
+                    osc.frequency.setValueAtTime(n, now);
+                    now += (i === fNotes.length - 1) ? 1.0 : 0.2;
+                });
+                osc.start(t); osc.stop(now);
+                this.bgmNode = osc;
+            }
+        }
+    };
+    
+    function toggleSound() { sound.toggleMute(); }
+    function showQuitModal() { document.getElementById('quit-modal').classList.remove('hidden'); }
+    function closeQuitModal() { document.getElementById('quit-modal').classList.add('hidden'); }
+    function backToTitle() { location.reload(); }
+
+    const DAMAGE_FACTOR = 0.6;
+    const weatherList = [
+        { id: 'normal', name: '晴天', color: 'bg-orange-500/30', overlay: 'transparent', bonus: 'ドラゴン', penalty: '水中', desc: 'ドラゴン↑ 水中↓' },
+        { id: 'rain', name: '大雨', color: 'bg-blue-600/30', overlay: 'rgba(0, 50, 200, 0.2)', bonus: '水中', penalty: '昆虫', desc: '水中↑ 昆虫↓' },
+        { id: 'sandstorm', name: '砂嵐', color: 'bg-amber-800/30', overlay: 'rgba(150, 100, 0, 0.3)', bonus: '恐竜', penalty: '英雄', desc: '恐竜↑ 英雄↓' },
+        { id: 'fog', name: '深い霧', color: 'bg-zinc-500/30', overlay: 'rgba(255, 255, 255, 0.1)', bonus: '絶滅動物', penalty: 'ドラゴン', desc: '絶滅動物↑ ドラゴン↓' }
+    ];
+
+    const allMoves = [
+        { name: "とっしん", power: 45, accuracy: 100, pp: 15, type: "動物", desc: "体当たり攻撃" },
+        { name: "かみくだく", power: 55, accuracy: 95, pp: 10, type: "恐竜", desc: "強靭なアゴで攻撃" },
+        { name: "ブレス", power: 65, accuracy: 90, pp: 8, type: "ドラゴン", desc: "属性エネルギー" },
+        { name: "ふみつけ", power: 70, accuracy: 80, pp: 8, type: "動物", desc: "重い一撃" },
+        { name: "ハサミうち", power: 60, accuracy: 90, pp: 10, type: "昆虫", desc: "鋭い爪で挟撃" },
+        { name: "ほうこう", power: 35, accuracy: 100, pp: 12, type: "恐竜", desc: "威嚇して攻撃" },
+        { name: "神龍の雷", power: 130, accuracy: 85, pp: 3, type: "ドラゴン", isSpecial: true, desc: "天から雷を落とす" },
+        { name: "海龍の大渦", power: 130, accuracy: 90, pp: 3, type: "水中", isSpecial: true, desc: "全てを飲み込む渦" },
+        { name: "王者の咆哮", power: 140, accuracy: 80, pp: 2, type: "恐竜", isSpecial: true, desc: "最強の衝撃波" },
+        { name: "彗星の突き", power: 120, accuracy: 90, pp: 3, type: "英雄", isSpecial: true, desc: "光速の一刺し" },
+        { name: "氷牙の襲撃", power: 125, accuracy: 85, pp: 3, type: "絶滅動物", isSpecial: true, desc: "凍てつく牙" },
+        { name: "大地揺らし", power: 110, accuracy: 100, pp: 4, type: "動物", isSpecial: true, desc: "全体への地響き" }
+    ];
+
+    const mastersData = [
+        { id: 'heracles', name: "ヘラクレス", type: "英雄", sprite: "💪", hp: 340, atk: 68, def: 50, moves: [0, 1, 3], special: 9, item: 'ハチマキ', itemName: 'きあいのハチマキ' },
+        { id: 'zeus', name: "ゼウス", type: "英雄", sprite: "⚡", hp: 320, atk: 65, def: 52, moves: [0, 2, 4], special: 9, item: '薬', itemName: 'かいふくの薬' },
+        { id: 'ouryuu', name: "おうりゅう", type: "ドラゴン", sprite: "🐉", hp: 360, atk: 62, def: 48, moves: [0, 1, 2], special: 6, item: '薬', itemName: 'かいふくの薬' },
+        { id: 'tartaros', name: "タルタロス", type: "英雄", sprite: "🔥", hp: 310, atk: 58, def: 55, moves: [0, 1, 4], special: 9, item: '薬', itemName: 'かいふくの薬' },
+        { id: 'lugh', name: "ルー", type: "英雄", sprite: "🗡️", hp: 290, atk: 70, def: 45, moves: [0, 1, 4], special: 9, item: 'ハチマキ', itemName: 'きあいのハチマキ' },
+        { id: 'odin', name: "オーディン", type: "英雄", sprite: "🛡️", hp: 330, atk: 60, def: 58, moves: [0, 1, 3], special: 9, item: '薬', itemName: 'かいふくの薬' },
+        { id: 'siegfried', name: "ジークフリート", type: "英雄", sprite: "⚔️", hp: 300, atk: 72, def: 42, moves: [0, 1, 4], special: 9, item: 'ハチマキ', itemName: 'きあいのハチマキ' },
+        { id: 'indra', name: "インドラ", type: "英雄", sprite: "🌩️", hp: 310, atk: 66, def: 48, moves: [0, 2, 4], special: 9, item: '薬', itemName: 'かいふくの薬' },
+        { id: 'shiva', name: "シヴァ", type: "英雄", sprite: "🕉️", hp: 320, atk: 64, def: 52, moves: [0, 1, 3], special: 9, item: '薬', itemName: 'かいふくの薬' },
+        { id: 'kronos', name: "クロノス", type: "英雄", sprite: "⏰", hp: 350, atk: 55, def: 60, moves: [0, 1, 2], special: 9, item: '薬', itemName: 'かいふくの薬' },
+        { id: 'vritra', name: "ヴリトラ", type: "ドラゴン", sprite: "🐲", hp: 340, atk: 60, def: 50, moves: [0, 2, 4], special: 6, item: '薬', itemName: 'かいふくの薬' },
+        { id: 'leviathan', name: "レヴィアタン", type: "水中", sprite: "🐋", hp: 380, atk: 58, def: 55, moves: [1, 2, 4], special: 7, item: '薬', itemName: 'かいふくの薬' }
+    ];
+
+    let player, player2, enemy, enemy2, currentWeather, isBusy = false, round = 0, opponents = [];
+    let turnCount = 0;
+    let difficulty = 'normal';
+    let battleMode = 'single'; // 'single' or 'tag'
+    let selectionPhase = 1; // 1: first character, 2: second character
+    let firstSelectedId = null;
+    let eventModifiers = { atkMult: 1, accPenalty: 0 };
+    let tournamentBracket = []; // トーナメント表のデータ
+    let bracketOpen = false;
+
+    function toggleBracket() {
+        bracketOpen = !bracketOpen;
+        const bracket = document.getElementById('tournament-bracket');
+        if (bracketOpen) {
+            bracket.classList.add('open');
+        } else {
+            bracket.classList.remove('open');
+        }
+    }
+
+    function initTournamentBracket() {
+        tournamentBracket = [];
+        const playerTeam = battleMode === 'tag' ? [player, player2] : [player];
+        
+        if (battleMode === 'tag') {
+            // タッグバトル: 2体ずつペアにする
+            for (let i = 0; i < opponents.length; i += 2) {
+                const enemyTeam = [opponents[i]];
+                if (i + 1 < opponents.length) {
+                    enemyTeam.push(opponents[i + 1]);
+                }
+                tournamentBracket.push({
+                    round: Math.floor(i / 2) + 1,
+                    playerTeam: playerTeam.map(p => ({ ...p, status: 'active' })),
+                    enemyTeam: enemyTeam.map(e => ({ ...e, status: 'pending' })),
+                    result: null, // 'win', 'lose', null
+                    current: false
+                });
+            }
+        } else {
+            // シングルバトル
+            opponents.forEach((opp, idx) => {
+                tournamentBracket.push({
+                    round: idx + 1,
+                    playerTeam: [{ ...player, status: 'active' }],
+                    enemyTeam: [{ ...opp, status: 'pending' }],
+                    result: null,
+                    current: false
+                });
+            });
+        }
+        
+        updateBracketDisplay();
+    }
+
+    function updateBracketDisplay() {
+        const content = document.getElementById('bracket-content');
+        content.innerHTML = '';
+        
+        tournamentBracket.forEach((match, idx) => {
+            const matchDiv = document.createElement('div');
+            matchDiv.className = 'bracket-match';
+            
+            const roundHeader = document.createElement('div');
+            roundHeader.className = 'text-xs font-bold text-indigo-400 mb-2 text-center';
+            roundHeader.textContent = `第${match.round}回戦`;
+            matchDiv.appendChild(roundHeader);
+            
+            // プレイヤーチーム
+            match.playerTeam.forEach(p => {
+                const fighterDiv = document.createElement('div');
+                fighterDiv.className = `bracket-fighter player-side ${
+                    match.result === 'win' ? 'winner' : (match.result === 'lose' ? 'loser' : '')
+                } ${match.current ? 'current' : ''}`;
+                fighterDiv.innerHTML = `
+                    <span>${p.sprite} ${p.name}</span>
+                    <span class="text-[9px] text-slate-400">${p.type}</span>
+                `;
+                matchDiv.appendChild(fighterDiv);
+            });
+            
+            // VS表示
+            const vsDiv = document.createElement('div');
+            vsDiv.className = 'text-center text-xs font-bold text-slate-500 my-1';
+            vsDiv.textContent = 'VS';
+            matchDiv.appendChild(vsDiv);
+            
+            // 敵チーム
+            match.enemyTeam.forEach(e => {
+                const fighterDiv = document.createElement('div');
+                fighterDiv.className = `bracket-fighter enemy-side ${
+                    match.result === 'lose' ? 'winner' : (match.result === 'win' ? 'loser' : '')
+                } ${match.current ? 'current' : ''}`;
+                fighterDiv.innerHTML = `
+                    <span>${e.sprite} ${e.name}</span>
+                    <span class="text-[9px] text-slate-400">${e.type}</span>
+                `;
+                matchDiv.appendChild(fighterDiv);
+            });
+            
+            // 結果表示
+            if (match.result) {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `text-center text-xs font-bold mt-2 ${
+                    match.result === 'win' ? 'text-emerald-400' : 'text-rose-400'
+                }`;
+                resultDiv.textContent = match.result === 'win' ? '⭕ 勝利' : '❌ 敗北';
+                matchDiv.appendChild(resultDiv);
+            } else if (match.current) {
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'text-center text-xs font-bold mt-2 text-yellow-400';
+                statusDiv.textContent = '⚔️ 対戦中';
+                matchDiv.appendChild(statusDiv);
+            }
+            
+            content.appendChild(matchDiv);
+        });
+    }
+
+    function updateBracketStatus(roundIndex, isWin) {
+        if (roundIndex >= 0 && roundIndex < tournamentBracket.length) {
+            tournamentBracket[roundIndex].result = isWin ? 'win' : 'lose';
+            tournamentBracket[roundIndex].current = false;
+            updateBracketDisplay();
+        }
+    }
+
+    function setCurrentMatch(roundIndex) {
+        tournamentBracket.forEach((match, idx) => {
+            match.current = (idx === roundIndex);
+        });
+        updateBracketDisplay();
+    }
+
+    function selectMode(mode) {
+        battleMode = mode;
+        document.getElementById('mode-screen').classList.add('hidden-screen');
+        document.getElementById('difficulty-screen').classList.remove('hidden-screen');
+        sound.init();
+        sound.playSe('select');
+    }
+
+    function selectDifficulty(diff) {
+        difficulty = diff;
+        document.getElementById('difficulty-screen').classList.add('hidden-screen');
+        document.getElementById('selection-screen').classList.remove('hidden-screen');
+        sound.playSe('select');
+        sound.playBgm('select');
+        selectionPhase = 1;
+        firstSelectedId = null;
+        initSelection();
+    }
+    
+    function backToDifficulty() {
+        document.getElementById('selection-screen').classList.add('hidden-screen');
+        document.getElementById('difficulty-screen').classList.remove('hidden-screen');
+        selectionPhase = 1;
+        firstSelectedId = null;
+    }
+
+    function addLog(msg, color = 'text-slate-200') {
+        const log = document.getElementById('log');
+        const p = document.createElement('p');
+        p.className = color + " mb-1 border-l-2 border-indigo-500 pl-2";
+        p.textContent = msg;
+        log.appendChild(p);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function updateHP(target) {
+        const p = Math.max(0, (target.hp / target.maxHp) * 100);
+        target.hpBar.style.width = p + '%';
+        target.hpText.textContent = `${Math.ceil(target.hp)} / ${target.maxHp}`;
+        target.hpBar.className = `hp-bar-fill ${p < 25 ? 'danger' : (p < 50 ? 'warning' : '')}`;
+    }
+
+    function initSelection() {
+        const grid = document.getElementById('selection-grid');
+        const title = document.getElementById('selection-title');
+        
+        if (battleMode === 'tag') {
+            title.textContent = selectionPhase === 1 ? '1体目を選択' : '2体目を選択';
+        } else {
+            title.textContent = 'パートナー選択';
+        }
+        
+        grid.innerHTML = '';
+        mastersData.forEach(c => {
+            // タッグバトルの2体目選択時、1体目と同じキャラは選べない
+            if (battleMode === 'tag' && selectionPhase === 2 && c.id === firstSelectedId) {
+                return;
+            }
+            
+            const div = document.createElement('div');
+            div.className = "bg-slate-800/50 border border-slate-700 rounded-2xl flex items-center p-4 text-white cursor-pointer active:scale-[0.98] transition-all";
+            div.onclick = () => { 
+                sound.playSe('select'); 
+                if (battleMode === 'tag' && selectionPhase === 1) {
+                    firstSelectedId = c.id;
+                    selectionPhase = 2;
+                    initSelection();
+                } else {
+                    startTournament(firstSelectedId || c.id, c.id); 
+                }
+            };
+            div.innerHTML = `
+                <span class="text-6xl mr-5">${c.sprite === 'Rex' ? '🦖' : c.sprite}</span>
+                <div class="flex-grow">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-lg">${c.name}</span>
+                        <span class="text-[9px] border border-slate-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">${c.type}</span>
+                    </div>
+                    <div class="flex gap-3 text-[10px] text-slate-400 font-bold">
+                        <span>HP:${c.hp}</span>
+                        <span>ATK:${c.atk}</span>
+                        <span>DEF:${c.def}</span>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(div);
+        });
+    }
+
+    function startTournament(id1, id2) {
+        const d1 = mastersData.find(c => c.id === id1);
+        player = { 
+            ...d1, 
+            maxHp: d1.hp, hp: d1.hp, itemUsed: false,
+            moveSet: [...d1.moves, d1.special].map(i => ({ ...allMoves[i], currentPP: allMoves[i].pp })),
+            spriteImg: document.getElementById('player-sprite'), 
+            hpBar: document.getElementById('player-hp-bar'), 
+            hpText: document.getElementById('player-hp-text')
+        };
+        document.getElementById('player-name-display').textContent = player.name;
+        document.getElementById('player-type-display').textContent = player.type;
+        player.spriteImg.textContent = player.sprite === 'Rex' ? '🦖' : player.sprite;
+        player.spriteImg.classList.remove('hidden');
+
+        if (battleMode === 'tag' && id2) {
+            const d2 = mastersData.find(c => c.id === id2);
+            player2 = { 
+                ...d2, 
+                maxHp: d2.hp, hp: d2.hp, itemUsed: false,
+                moveSet: [...d2.moves, d2.special].map(i => ({ ...allMoves[i], currentPP: allMoves[i].pp })),
+                spriteImg: document.getElementById('player2-sprite'), 
+                hpBar: document.getElementById('player2-hp-bar'), 
+                hpText: document.getElementById('player2-hp-text')
+            };
+            document.getElementById('player2-name-display').textContent = player2.name;
+            document.getElementById('player2-type-display').textContent = player2.type;
+            player2.spriteImg.textContent = player2.sprite === 'Rex' ? '🦖' : player2.sprite;
+            player2.spriteImg.classList.remove('hidden');
+            document.getElementById('player-status-2').classList.remove('hidden');
+            
+            opponents = mastersData.filter(c => c.id !== id1 && c.id !== id2).sort(() => Math.random() - 0.5);
+        } else {
+            player2 = null;
+            document.getElementById('player2-sprite').classList.add('hidden');
+            document.getElementById('player-status-2').classList.add('hidden');
+            opponents = mastersData.filter(c => c.id !== id1).sort(() => Math.random() - 0.5);
+        }
+        
+        document.getElementById('selection-screen').classList.add('hidden-screen');
+        document.getElementById('battle-screen').classList.remove('hidden-screen');
+        document.getElementById('ui-box').classList.remove('hidden-screen');
+        
+        initTournamentBracket();
+        setupMatch();
+        sound.playBgm('battle');
+        
+        // トーナメント表を自動表示
+        setTimeout(() => {
+            toggleBracket();
+            setTimeout(() => toggleBracket(), 3000); // 3秒後に自動で閉じる
+        }, 500);
+    }
+
+    function setupMatch() {
+        player.hp = player.maxHp;
+        player.itemUsed = false;
+        if (player2) {
+            player2.hp = player2.maxHp;
+            player2.itemUsed = false;
+        }
+        
+        // 各バトル開始時にPPを少し回復
+        if (round > 0) {
+            player.moveSet.forEach(move => {
+                move.currentPP = Math.min(move.pp, move.currentPP + 2);
+            });
+            if (player2) {
+                player2.moveSet.forEach(move => {
+                    move.currentPP = Math.min(move.pp, move.currentPP + 2);
+                });
+            }
+        }
+        
+        turnCount = 0;
+        eventModifiers = { atkMult: 1, accPenalty: 0 };
+
+        const baseEnemy = opponents[round];
+        let multiplier = difficulty === 'easy' ? 0.8 : (difficulty === 'hard' ? 1.2 : 1.0);
+
+        enemy = { 
+            ...baseEnemy, 
+            maxHp: Math.floor(baseEnemy.hp * multiplier), 
+            hp: Math.floor(baseEnemy.hp * multiplier), 
+            atk: Math.floor(baseEnemy.atk * multiplier), 
+            def: Math.floor(baseEnemy.def * multiplier),
+            itemUsed: false, 
+            moveSet: [...baseEnemy.moves, baseEnemy.special].map(i => ({ ...allMoves[i] })),
+            spriteImg: document.getElementById('enemy-sprite'), 
+            hpBar: document.getElementById('enemy-hp-bar'), 
+            hpText: document.getElementById('enemy-hp-text')
+        };
+        
+        document.getElementById('enemy-name-display').textContent = enemy.name;
+        document.getElementById('enemy-type-display').textContent = enemy.type;
+        enemy.spriteImg.textContent = enemy.sprite === 'Rex' ? '🦖' : enemy.sprite;
+        enemy.spriteImg.style.opacity = 1;
+        enemy.spriteImg.classList.remove('hidden');
+        
+        // タッグバトルの場合、2体目の敵を追加
+        if (battleMode === 'tag' && round + 1 < opponents.length) {
+            const baseEnemy2 = opponents[round + 1];
+            enemy2 = { 
+                ...baseEnemy2, 
+                maxHp: Math.floor(baseEnemy2.hp * multiplier), 
+                hp: Math.floor(baseEnemy2.hp * multiplier), 
+                atk: Math.floor(baseEnemy2.atk * multiplier), 
+                def: Math.floor(baseEnemy2.def * multiplier),
+                itemUsed: false, 
+                moveSet: [...baseEnemy2.moves, baseEnemy2.special].map(i => ({ ...allMoves[i] })),
+                spriteImg: document.getElementById('enemy2-sprite'), 
+                hpBar: document.getElementById('enemy2-hp-bar'), 
+                hpText: document.getElementById('enemy2-hp-text')
+            };
+            
+            document.getElementById('enemy2-name-display').textContent = enemy2.name;
+            document.getElementById('enemy2-type-display').textContent = enemy2.type;
+            enemy2.spriteImg.textContent = enemy2.sprite === 'Rex' ? '🦖' : enemy2.sprite;
+            enemy2.spriteImg.style.opacity = 1;
+            enemy2.spriteImg.classList.remove('hidden');
+            document.getElementById('enemy-status-2').classList.remove('hidden');
+        } else {
+            enemy2 = null;
+            document.getElementById('enemy2-sprite').classList.add('hidden');
+            document.getElementById('enemy-status-2').classList.add('hidden');
+        }
+        
+        const totalRounds = battleMode === 'tag' ? Math.ceil(opponents.length / 2) : opponents.length;
+        const currentRound = battleMode === 'tag' ? Math.floor(round / 2) + 1 : round + 1;
+        document.getElementById('tournament-info').textContent = `${currentRound} / ${totalRounds} 回戦`;
+
+        currentWeather = weatherList[Math.floor(Math.random() * weatherList.length)];
+        const wb = document.getElementById('weather-banner');
+        wb.textContent = "天候: " + currentWeather.name;
+        wb.className = "weather-banner " + currentWeather.color;
+        document.getElementById('weather-overlay').style.backgroundColor = currentWeather.overlay;
+
+        updateHP(player); 
+        updateHP(enemy);
+        if (player2) updateHP(player2);
+        if (enemy2) updateHP(enemy2);
+        
+        document.getElementById('player-item-display').textContent = `📦 ${player.itemName}`;
+        document.getElementById('enemy-item-display').textContent = `📦 ${enemy.itemName}`;
+        if (player2) document.getElementById('player2-item-display').textContent = `📦 ${player2.itemName}`;
+        if (enemy2) document.getElementById('enemy2-item-display').textContent = `📦 ${enemy2.itemName}`;
+        
+        updateControls();
+        document.getElementById('log').innerHTML = '';
+        
+        if (battleMode === 'tag' && enemy2) {
+            addLog(`${enemy.name} と ${enemy2.name} が立ちはだかった！`);
+        } else {
+            addLog(`${enemy.name} が立ちはだかった！`);
+        }
+        
+        // PP回復のお知らせ（2回戦目以降）
+        if (round > 0 && round < opponents.length) {
+            addLog('▶ 各技のPPが2ずつ回復した！', 'text-cyan-400');
+        }
+        
+        // トーナメント表の現在の対戦をハイライト
+        const bracketIndex = battleMode === 'tag' ? Math.floor(round / 2) : round;
+        setCurrentMatch(bracketIndex);
+    }
+
+    function updateControls() {
+        const c = document.getElementById('controls');
+        c.innerHTML = '';
+        player.moveSet.forEach((m, i) => {
+            const btn = document.createElement('button');
+            const isSpec = m.isSpecial;
+            const isPpOut = m.currentPP <= 0;
+
+            btn.className = `action-button shadow-lg ${isSpec ? 'special-move-btn' : ''}`;
+            btn.disabled = isPpOut || isBusy;
+            
+            btn.innerHTML = `
+                <div class="flex justify-between w-full font-bold text-xs">
+                    <span>${isSpec ? '★' : ''}${m.name}</span>
+                    <span class="${isPpOut ? 'text-rose-500' : 'text-indigo-300'}">PP ${m.currentPP}</span>
+                </div>
+                <div class="text-[9px] text-slate-400 font-normal leading-tight h-5 overflow-hidden">${m.desc}</div>
+                <div class="flex justify-between w-full border-t border-white/5 mt-1.5 pt-1.5 text-[9px] font-black tracking-tighter">
+                    <span class="bg-indigo-500/20 px-1 rounded">POW:${m.power}</span>
+                    <span class="bg-indigo-500/20 px-1 rounded">HIT:${m.accuracy}%</span>
+                </div>
+            `;
+            btn.onclick = () => { sound.playSe('select'); handleTurn(i); };
+            c.appendChild(btn);
+        });
+    }
+
+    async function triggerRandomEvent() {
+        const events = [
+            { name: "応援の力", msg: "観客の熱狂的な応援！攻撃力が上昇した！", mod: { atkMult: 1.5, accPenalty: 0 } },
+            { name: "霧の乱入", msg: "視界不良！技が当たりにくくなった！", mod: { atkMult: 1, accPenalty: 20 } },
+            { name: "闘志の波動", msg: "闘志がぶつかり合う！互いに隙を突く構え！", mod: { atkMult: 1.2, accPenalty: 5 } }
+        ];
+        const evt = events[Math.floor(Math.random() * events.length)];
+        eventModifiers = evt.mod;
+
+        sound.playSe('event');
+        const overlay = document.getElementById('event-overlay');
+        overlay.textContent = evt.name;
+        overlay.classList.remove('hidden');
+        overlay.classList.add('event-pop');
+        addLog(`【EVENT】${evt.msg}`, 'text-amber-400');
+
+        await new Promise(r => setTimeout(r, 2000));
+        overlay.classList.remove('event-pop');
+        overlay.classList.add('hidden');
+    }
+
+    async function handleTurn(idx) {
+        if (isBusy) return;
+        isBusy = true;
+        turnCount++;
+        
+        const m = player.moveSet[idx];
+        m.currentPP--;
+        updateControls();
+
+        if (turnCount % 3 === 0) {
+            await triggerRandomEvent();
+        }
+
+        // プレイヤー1の攻撃
+        const target1 = (battleMode === 'tag' && enemy2 && enemy2.hp > 0 && Math.random() < 0.5) ? enemy2 : enemy;
+        await executeMove(player, target1, m, 'player');
+        
+        // タッグバトル: プレイヤー2の攻撃
+        if (battleMode === 'tag' && player2 && player2.hp > 0 && (enemy.hp > 0 || (enemy2 && enemy2.hp > 0))) {
+            await new Promise(r => setTimeout(r, 600));
+            const p2Move = player2.moveSet[Math.floor(Math.random() * player2.moveSet.length)];
+            const target2 = (enemy2 && enemy2.hp > 0 && Math.random() < 0.5) ? enemy2 : enemy;
+            if (target2.hp > 0) {
+                await executeMove(player2, target2, p2Move, 'player2');
+            }
+        }
+        
+        // 敵1の攻撃
+        if (enemy.hp > 0) {
+            await new Promise(r => setTimeout(r, 800));
+            let enemyMove = enemy.moveSet[Math.floor(Math.random() * enemy.moveSet.length)];
+            const playerTarget = (battleMode === 'tag' && player2 && player2.hp > 0 && Math.random() < 0.5) ? player2 : player;
+            await executeMove(enemy, playerTarget, enemyMove, 'enemy');
+        }
+        
+        // タッグバトル: 敵2の攻撃
+        if (battleMode === 'tag' && enemy2 && enemy2.hp > 0 && (player.hp > 0 || (player2 && player2.hp > 0))) {
+            await new Promise(r => setTimeout(r, 600));
+            let enemy2Move = enemy2.moveSet[Math.floor(Math.random() * enemy2.moveSet.length)];
+            const playerTarget2 = (player2 && player2.hp > 0 && Math.random() < 0.5) ? player2 : player;
+            if (playerTarget2.hp > 0) {
+                await executeMove(enemy2, playerTarget2, enemy2Move, 'enemy2');
+            }
+        }
+
+        // 勝敗判定
+        const allPlayersDead = player.hp <= 0 && (!player2 || player2.hp <= 0);
+        const allEnemiesDead = enemy.hp <= 0 && (!enemy2 || enemy2.hp <= 0);
+
+        if (allPlayersDead) {
+            addLog(`全滅してしまった...`, 'text-rose-500');
+            const bracketIndex = battleMode === 'tag' ? Math.floor(round / 2) : round;
+            updateBracketStatus(bracketIndex, false);
+            document.getElementById('controls').classList.add('hidden');
+            document.getElementById('restart-ctrl').classList.remove('hidden');
+            sound.bgmType = null;
+        } else if (allEnemiesDead) {
+            addLog(`${enemy.name}${enemy2 ? 'たち' : ''}を突破した！`, 'text-emerald-400');
+            sound.playBgm('win');
+            enemy.spriteImg.style.opacity = 0;
+            if (enemy2) enemy2.spriteImg.style.opacity = 0;
+            
+            // トーナメント表を更新
+            const bracketIndex = battleMode === 'tag' ? Math.floor(round / 2) : round;
+            updateBracketStatus(bracketIndex, true);
+            
+            // タッグバトルの場合は2ラウンド進む
+            const roundIncrement = battleMode === 'tag' && enemy2 ? 2 : 1;
+            
+            // PP全回復ボーナス（3, 5, 8回戦突破時）
+            const bonusRound1 = battleMode === 'tag' ? 4 : 2;   // 3回戦目
+            const bonusRound2 = battleMode === 'tag' ? 8 : 4;   // 5回戦目
+            const bonusRound3 = battleMode === 'tag' ? 14 : 7;  // 8回戦目
+            
+            if (round === bonusRound1) {
+                await new Promise(r => setTimeout(r, 800));
+                addLog(`【3回戦突破ボーナス】全PPが回復した！`, 'text-sky-400 font-bold');
+                player.moveSet.forEach(move => move.currentPP = move.pp);
+                if (player2) player2.moveSet.forEach(move => move.currentPP = move.pp);
+                sound.playSe('heal');
+            } else if (round === bonusRound2) {
+                await new Promise(r => setTimeout(r, 800));
+                addLog(`【5回戦突破ボーナス】全PPが回復した！`, 'text-emerald-400 font-bold');
+                player.moveSet.forEach(move => move.currentPP = move.pp);
+                if (player2) player2.moveSet.forEach(move => move.currentPP = move.pp);
+                sound.playSe('heal');
+            } else if (round === bonusRound3) {
+                await new Promise(r => setTimeout(r, 800));
+                addLog(`【8回戦突破ボーナス】全PPが回復した！`, 'text-yellow-400 font-bold');
+                player.moveSet.forEach(move => move.currentPP = move.pp);
+                if (player2) player2.moveSet.forEach(move => move.currentPP = move.pp);
+                sound.playSe('heal');
+            }
+
+            round += roundIncrement;
+            await new Promise(r => setTimeout(r, 1500));
+            
+            // トーナメント表を表示
+            if (!bracketOpen) {
+                toggleBracket();
+                await new Promise(r => setTimeout(r, 2000));
+                toggleBracket();
+            }
+            
+            if (round < opponents.length) {
+                sound.playBgm('battle');
+                setupMatch();
+            } else { 
+                addLog("全トーナメント制覇！最強の証明だ！", 'text-yellow-400 font-black text-lg'); 
+                sound.playBgm('fanfare');
+                document.getElementById('controls').classList.add('hidden'); 
+                document.getElementById('restart-ctrl').classList.remove('hidden'); 
+            }
+        }
+        
+        isBusy = false;
+        updateControls();
+    }
+
+    async function executeMove(atk, def, move, role) {
+        addLog(`${atk.name} の ${move.name}！`);
+        if (move.isSpecial) {
+            const flash = document.getElementById('flash-overlay');
+            flash.style.opacity = 0.5;
+            setTimeout(() => flash.style.opacity = 0, 100);
+            sound.playSe('special');
+        } else {
+            sound.playSe('attack');
+        }
+
+        const isPlayerSide = (role === 'player' || role === 'player2');
+        atk.spriteImg.style.transform = isPlayerSide ? 'translate(20px, -20px)' : 'translate(-20px, 20px)';
+        await new Promise(r => setTimeout(r, 150));
+        atk.spriteImg.style.transform = '';
+
+        const effectiveAccuracy = move.accuracy - eventModifiers.accPenalty;
+        if (Math.random() * 100 > effectiveAccuracy) { 
+            addLog("▶ しかし、攻撃ははずれた！", 'text-slate-400'); 
+            return; 
+        }
+
+        let baseDmg = (move.power * (atk.atk / def.def)) * DAMAGE_FACTOR;
+        let weatherMod = (atk.type === currentWeather.bonus) ? 1.3 : (atk.type === currentWeather.penalty ? 0.7 : 1.0);
+        
+        let dmg = Math.floor(baseDmg * weatherMod * eventModifiers.atkMult * (0.9 + Math.random() * 0.2));
+        if (Math.random() < 0.1) { dmg = Math.floor(dmg * 1.5); addLog("▶ 急所に当たった！大ダメージ！", 'text-rose-400'); }
+
+        if (def.item === 'ハチマキ' && !def.itemUsed && def.hp > 1 && def.hp - dmg <= 0) {
+            dmg = def.hp - 1; def.itemUsed = true;
+            addLog(`▶ ${def.name} は耐えた！土俵際の粘りだ！`, 'text-indigo-400');
+            
+            // アイテム表示をクリア
+            const itemDisplayId = (def === player) ? 'player-item-display' : 
+                                  (def === player2) ? 'player2-item-display' :
+                                  (def === enemy) ? 'enemy-item-display' : 'enemy2-item-display';
+            document.getElementById(itemDisplayId).textContent = "";
+        }
+
+        def.hp = Math.max(0, def.hp - dmg);
+        updateHP(def);
+        sound.playSe('damage');
+        def.spriteImg.classList.add('shake');
+        await new Promise(r => setTimeout(r, 400));
+        def.spriteImg.classList.remove('shake');
+
+        if (def.item === '薬' && !def.itemUsed && def.hp > 0 && def.hp < def.maxHp * 0.3) {
+            const heal = Math.floor(def.maxHp * 0.5);
+            def.hp = Math.min(def.maxHp, def.hp + heal);
+            def.itemUsed = true;
+            addLog(`▶ ${def.name} は回復アイテムを使用した！`, 'text-emerald-400');
+            sound.playSe('heal');
+            updateHP(def);
+            
+            // アイテム表示をクリア
+            const itemDisplayId = (def === player) ? 'player-item-display' : 
+                                  (def === player2) ? 'player2-item-display' :
+                                  (def === enemy) ? 'enemy-item-display' : 'enemy2-item-display';
+            document.getElementById(itemDisplayId).textContent = "";
+        }
+    }
+</script>
+</body>
+</html>

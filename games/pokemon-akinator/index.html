@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケモンアーキネーター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .pokemon-card {
+            transition: all 0.3s ease;
+        }
+        .pokemon-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .candidate-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .hint-badge {
+            display: inline-block;
+            margin: 2px;
+            padding: 4px 8px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 12px;
+            font-size: 11px;
+        }
+        .sound-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+        .sound-toggle:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body class="p-4">
+    <!-- 音楽ON/OFFボタン -->
+    <div class="sound-toggle" onclick="toggleSound()">
+        <span id="sound-icon" class="text-2xl">🔊</span>
+    </div>
+    
+    <div class="max-w-6xl mx-auto">
+        <!-- タイトル画面 -->
+        <div id="title-screen" class="text-center py-20">
+            <h1 class="text-6xl font-bold text-white mb-4 fade-in">🔮 ポケモンアーキネーター</h1>
+            <p class="text-xl text-white/80 mb-8">あなたが<ruby>思<rt>おも</rt></ruby>い<ruby>浮<rt>う</rt></ruby>かべたポケモンを<ruby>当<rt>あ</rt></ruby>ててみせます！</p>
+            <div class="flex flex-col gap-4 max-w-md mx-auto">
+                <button onclick="startQuiz()" class="bg-white text-purple-600 px-8 py-4 rounded-full font-bold text-xl hover:bg-purple-100 transition-all transform hover:scale-105 shadow-lg">
+                    🎮 クイズを<ruby>始<rt>はじ</rt></ruby>める
+                </button>
+                <button onclick="showRiddle()" class="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-8 py-4 rounded-full font-bold text-xl hover:from-pink-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg">
+                    🧩 なぞなぞモード
+                </button>
+                <button onclick="showPokedex()" class="bg-purple-700 text-white px-8 py-4 rounded-full font-bold text-xl hover:bg-purple-800 transition-all transform hover:scale-105 shadow-lg">
+                    📖 ポケモン<ruby>図鑑<rt>ずかん</rt></ruby>
+                </button>
+            </div>
+            <div class="mt-8 text-white/60 text-sm">
+                <p><ruby>初代<rt>しょだい</rt></ruby>ポケモン151<ruby>匹<rt>ひき</rt></ruby>に<ruby>対応<rt>たいおう</rt></ruby></p>
+            </div>
+        </div>
+
+        <!-- クイズ画面 -->
+        <div id="quiz-screen" class="hidden">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-purple-600"><ruby>質問<rt>しつもん</rt></ruby> <span id="question-number">1</span> / 20</h2>
+                    <button onclick="backToTitle()" class="text-purple-600 hover:text-purple-800 font-bold">
+                        🏠 タイトルへ
+                    </button>
+                </div>
+
+                <!-- 質問エリア -->
+                <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-8 mb-6 min-h-[200px] flex items-center justify-center">
+                    <p id="question-text" class="text-3xl font-bold text-center text-purple-900"></p>
+                </div>
+
+                <!-- 回答ボタン -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <button onclick="answer('yes')" class="bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-2xl font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        ✅ はい
+                    </button>
+                    <button onclick="answer('no')" class="bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-2xl font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        ❌ いいえ
+                    </button>
+                    <button onclick="answer('maybe')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-4 rounded-2xl font-bold text-xl transition-all transform hover:scale-105 shadow-lg col-span-2">
+                        🤔 わからない / どちらでもない
+                    </button>
+                </div>
+
+                <!-- 候補ポケモン表示 -->
+                <div class="mt-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-purple-600"><ruby>候補<rt>こうほ</rt></ruby>ポケモン (<span id="candidate-count">151</span><ruby>匹<rt>ひき</rt></ruby>)</h3>
+                        <button onclick="toggleCandidates()" class="text-sm text-purple-600 hover:text-purple-800 font-bold">
+                            <span id="toggle-text">▼ <ruby>表示<rt>ひょうじ</rt></ruby></span>
+                        </button>
+                    </div>
+                    <div id="candidate-list" class="candidate-list hidden bg-gray-50 rounded-xl p-4 grid grid-cols-4 md:grid-cols-6 gap-2">
+                        <!-- ここに<ruby>候補<rt>こうほ</rt></ruby>ポケモンが<ruby>表示<rt>ひょうじ</rt></ruby>されます -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 結果画面 -->
+        <div id="result-screen" class="hidden">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 text-center fade-in">
+                <h2 class="text-3xl font-bold text-purple-600 mb-6"><ruby>答<rt>こた</rt></ruby>えはこのポケモンですね！</h2>
+                <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-8 mb-6">
+                    <div class="text-8xl mb-4" id="result-sprite">🔮</div>
+                    <h3 class="text-4xl font-bold text-purple-900 mb-2" id="result-name">???</h3>
+                    <p class="text-lg text-gray-600" id="result-type"></p>
+                </div>
+                <div class="flex gap-4 justify-center">
+                    <button onclick="startQuiz()" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-full font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        🔄 もう<ruby>一度<rt>いちど</rt></ruby>
+                    </button>
+                    <button onclick="backToTitle()" class="bg-gray-600 hover:bg-gray-700 text-white px-8 py-4 rounded-full font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        🏠 タイトルへ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 図鑑画面 -->
+        <div id="pokedex-screen" class="hidden">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold text-purple-600">📖 ポケモン<ruby>図鑑<rt>ずかん</rt></ruby></h2>
+                    <button onclick="backToTitle()" class="text-purple-600 hover:text-purple-800 font-bold">
+                        🏠 タイトルへ
+                    </button>
+                </div>
+                
+                <div class="mb-6">
+                    <input type="text" id="search-input" placeholder="🔍 ポケモンをさがす..." 
+                           onkeyup="filterPokedex()" 
+                           class="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:outline-none focus:border-purple-600">
+                </div>
+
+                <div id="pokedex-list" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[600px] overflow-y-auto">
+                    <!-- ポケモンカードが動的に表示される -->
+                </div>
+            </div>
+        </div>
+
+        <!-- なぞなぞ難易度選択画面 -->
+        <div id="riddle-difficulty-screen" class="hidden">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 text-center fade-in">
+                <h2 class="text-4xl font-bold text-purple-600 mb-4">🧩 なぞなぞモード</h2>
+                <p class="text-lg text-gray-600 mb-8">ポケモンのなぞなぞに<ruby>挑戦<rt>ちょうせん</rt></ruby>しよう！<br><ruby>難易度<rt>なんいど</rt></ruby>をえらんでね</p>
+                <div class="flex flex-col gap-4 max-w-md mx-auto">
+                    <button onclick="startRiddle('easy')" class="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-full font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        😊 かんたん（10<ruby>問<rt>もん</rt></ruby>）
+                    </button>
+                    <button onclick="startRiddle('normal')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-8 py-4 rounded-full font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        🤔 ふつう（20<ruby>問<rt>もん</rt></ruby>）
+                    </button>
+                    <button onclick="startRiddle('hard')" class="bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-full font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        😤 むずかしい（30<ruby>問<rt>もん</rt></ruby>）
+                    </button>
+                </div>
+                <button onclick="backToTitle()" class="mt-8 text-purple-600 hover:text-purple-800 font-bold">
+                    🏠 タイトルへもどる
+                </button>
+            </div>
+        </div>
+
+        <!-- なぞなぞプレイ画面 -->
+        <div id="riddle-play-screen" class="hidden">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-purple-600">🧩 なぞなぞ <span id="riddle-number">1</span> / <span id="riddle-total">10</span></h2>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600"><ruby>正解数<rt>せいかいすう</rt></ruby>: <span id="riddle-score" class="text-green-600 font-bold">0</span></p>
+                        <button onclick="backToTitle()" class="text-purple-600 hover:text-purple-800 font-bold text-sm">
+                            🏠 タイトルへ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- なぞなぞ問題 -->
+                <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-8 mb-6 min-h-[200px]">
+                    <p id="riddle-question" class="text-2xl font-bold text-center text-purple-900 mb-4"></p>
+                    <div id="riddle-hint" class="text-center text-gray-600 text-sm"></div>
+                </div>
+
+                <!-- 選択肢 -->
+                <div id="riddle-choices" class="grid grid-cols-2 gap-4">
+                    <!-- 選択肢がここに動的に表示される -->
+                </div>
+            </div>
+        </div>
+
+        <!-- なぞなぞ結果画面 -->
+        <div id="riddle-result-screen" class="hidden">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 text-center fade-in">
+                <h2 class="text-4xl font-bold text-purple-600 mb-4">🎉 おつかれさま！</h2>
+                <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-8 mb-6">
+                    <p class="text-6xl mb-4" id="riddle-final-emoji">🏆</p>
+                    <p class="text-3xl font-bold text-purple-900 mb-2"><span id="riddle-final-score">0</span> / <span id="riddle-final-total">10</span> <ruby>問正解<rt>もんせいかい</rt></ruby>！</p>
+                    <p id="riddle-final-comment" class="text-xl text-gray-600"></p>
+                </div>
+                <div class="flex gap-4 justify-center">
+                    <button onclick="showRiddle()" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-full font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        🔄 もう<ruby>一度<rt>いちど</rt></ruby>
+                    </button>
+                    <button onclick="backToTitle()" class="bg-gray-600 hover:bg-gray-700 text-white px-8 py-4 rounded-full font-bold text-xl transition-all transform hover:scale-105 shadow-lg">
+                        🏠 タイトルへ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ポケモン詳細モーダル -->
+        <div id="pokemon-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="closeModal(event)">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full mx-4" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-start mb-6">
+                    <h3 class="text-3xl font-bold text-purple-600" id="modal-name">ポケモン名</h3>
+                    <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
+                </div>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="text-center">
+                        <div class="text-8xl mb-4" id="modal-sprite">🔮</div>
+                        <p class="text-xl text-gray-600 mb-2">No. <span id="modal-no"></span></p>
+                        <p class="text-lg" id="modal-type"></p>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-bold text-purple-600 mb-3">🎯 クイズのヒント</h4>
+                        <div id="modal-hints" class="space-y-2">
+                            <!-- ヒントが表示される -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ポケモンデータ
+        const pokemonData = [
+            { no: 1, name: "フシギダネ", type: "くさ・どく", sprite: "🌱", generation: 1, stage: "初期", color: "緑", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 2, name: "フシギソウ", type: "くさ・どく", sprite: "🌿", generation: 1, stage: "中間", color: "緑", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "草原" },
+            { no: 3, name: "フシギバナ", type: "くさ・どく", sprite: "🌺", generation: 1, stage: "最終", color: "緑", pattern: "花", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 4, name: "ヒトカゲ", type: "ほのお", sprite: "🦎", generation: 1, stage: "初期", color: "赤", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "山地" },
+            { no: 5, name: "リザード", type: "ほのお", sprite: "🦖", generation: 1, stage: "中間", color: "赤", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "山地" },
+            { no: 6, name: "リザードン", type: "ほのお・ひこう", sprite: "🐉", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 4, tail: true, wings: true, canFly: true, legendary: false, evolves: false, size: "大", weight: "重", habitat: "山地" },
+            { no: 7, name: "ゼニガメ", type: "みず", sprite: "🐢", generation: 1, stage: "初期", color: "青", pattern: "甲羅", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "水辺" },
+            { no: 8, name: "カメール", type: "みず", sprite: "🐢", generation: 1, stage: "中間", color: "青", pattern: "甲羅", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "水辺" },
+            { no: 9, name: "カメックス", type: "みず", sprite: "🐢", generation: 1, stage: "最終", color: "青", pattern: "甲羅", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "水辺" },
+            { no: 10, name: "キャタピー", type: "むし", sprite: "🐛", generation: 1, stage: "初期", color: "緑", pattern: "しま", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "森林" },
+            { no: 11, name: "トランセル", type: "むし", sprite: "🥚", generation: 1, stage: "中間", color: "緑", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "森林" },
+            { no: 12, name: "バタフリー", type: "むし・ひこう", sprite: "🦋", generation: 1, stage: "最終", color: "白", pattern: "模様", limbs: 6, tail: false, wings: true, canFly: true, legendary: false, evolves: false, size: "中", weight: "軽", habitat: "森林" },
+            { no: 13, name: "ビードル", type: "むし・どく", sprite: "🐛", generation: 1, stage: "初期", color: "黄", pattern: "しま", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "森林" },
+            { no: 14, name: "コクーン", type: "むし・どく", sprite: "🥚", generation: 1, stage: "中間", color: "黄", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "森林" },
+            { no: 15, name: "スピアー", type: "むし・どく", sprite: "🐝", generation: 1, stage: "最終", color: "黄", pattern: "しま", limbs: 6, tail: true, wings: true, canFly: true, legendary: false, evolves: false, size: "中", weight: "軽", habitat: "森林" },
+            { no: 16, name: "ポッポ", type: "ノーマル・ひこう", sprite: "🐦", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 17, name: "ピジョン", type: "ノーマル・ひこう", sprite: "🐦", generation: 1, stage: "中間", color: "茶", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: false, evolves: true, size: "中", weight: "軽", habitat: "草原" },
+            { no: 18, name: "ピジョット", type: "ノーマル・ひこう", sprite: "🦅", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: false, evolves: false, size: "大", weight: "中", habitat: "草原" },
+            { no: 19, name: "コラッタ", type: "ノーマル", sprite: "🐀", generation: 1, stage: "初期", color: "紫", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "都市" },
+            { no: 20, name: "ラッタ", type: "ノーマル", sprite: "🐀", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "都市" },
+            { no: 21, name: "オニスズメ", type: "ノーマル・ひこう", sprite: "🐦", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 22, name: "オニドリル", type: "ノーマル・ひこう", sprite: "🦅", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: false, evolves: false, size: "大", weight: "中", habitat: "草原" },
+            { no: 23, name: "アーボ", type: "どく", sprite: "🐍", generation: 1, stage: "初期", color: "紫", pattern: "しま", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "草原" },
+            { no: 24, name: "アーボック", type: "どく", sprite: "🐍", generation: 1, stage: "最終", color: "紫", pattern: "しま", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 25, name: "ピカチュウ", type: "でんき", sprite: "⚡", generation: 1, stage: "中間", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "森林" },
+            { no: 26, name: "ライチュウ", type: "でんき", sprite: "⚡", generation: 1, stage: "最終", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "森林" },
+            { no: 27, name: "サンド", type: "じめん", sprite: "🦔", generation: 1, stage: "初期", color: "黄", pattern: "甲羅", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "中", habitat: "砂漠" },
+            { no: 28, name: "サンドパン", type: "じめん", sprite: "🦔", generation: 1, stage: "最終", color: "黄", pattern: "甲羅", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "砂漠" },
+            { no: 29, name: "ニドラン♀", type: "どく", sprite: "🐭", generation: 1, stage: "初期", color: "青", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 30, name: "ニドリーナ", type: "どく", sprite: "🐭", generation: 1, stage: "中間", color: "青", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "草原" },
+            { no: 31, name: "ニドクイン", type: "どく・じめん", sprite: "🦏", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 32, name: "ニドラン♂", type: "どく", sprite: "🐭", generation: 1, stage: "初期", color: "紫", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 33, name: "ニドリーノ", type: "どく", sprite: "🐭", generation: 1, stage: "中間", color: "紫", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "草原" },
+            { no: 34, name: "ニドキング", type: "どく・じめん", sprite: "🦏", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 35, name: "ピッピ", type: "フェアリー", sprite: "🧚", generation: 1, stage: "初期", color: "ピンク", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "山地" },
+            { no: 36, name: "ピクシー", type: "フェアリー", sprite: "🧚", generation: 1, stage: "最終", color: "ピンク", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "山地" },
+            { no: 37, name: "ロコン", type: "ほのお", sprite: "🦊", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 38, name: "キュウコン", type: "ほのお", sprite: "🦊", generation: 1, stage: "最終", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "草原" },
+            { no: 39, name: "プリン", type: "ノーマル・フェアリー", sprite: "🎤", generation: 1, stage: "初期", color: "ピンク", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 40, name: "プクリン", type: "ノーマル・フェアリー", sprite: "🎤", generation: 1, stage: "最終", color: "ピンク", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "草原" },
+            { no: 41, name: "ズバット", type: "どく・ひこう", sprite: "🦇", generation: 1, stage: "初期", color: "青", pattern: "無地", limbs: 0, tail: true, wings: true, canFly: true, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "洞窟" },
+            { no: 42, name: "ゴルバット", type: "どく・ひこう", sprite: "🦇", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 0, tail: true, wings: true, canFly: true, legendary: false, evolves: false, size: "大", weight: "中", habitat: "洞窟" },
+            { no: 43, name: "ナゾノクサ", type: "くさ・どく", sprite: "🌱", generation: 1, stage: "初期", color: "青", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 44, name: "クサイハナ", type: "くさ・どく", sprite: "🌺", generation: 1, stage: "中間", color: "赤", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "草原" },
+            { no: 45, name: "ラフレシア", type: "くさ・どく", sprite: "🌺", generation: 1, stage: "最終", color: "赤", pattern: "花", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 46, name: "パラス", type: "むし・くさ", sprite: "🐛", generation: 1, stage: "初期", color: "赤", pattern: "無地", limbs: 6, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "森林" },
+            { no: 47, name: "パラセクト", type: "むし・くさ", sprite: "🍄", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 6, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "森林" },
+            { no: 48, name: "コンパン", type: "むし・どく", sprite: "🦟", generation: 1, stage: "初期", color: "紫", pattern: "無地", limbs: 6, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "森林" },
+            { no: 49, name: "モルフォン", type: "むし・どく", sprite: "🦋", generation: 1, stage: "最終", color: "紫", pattern: "模様", limbs: 6, tail: false, wings: true, canFly: true, legendary: false, evolves: false, size: "大", weight: "中", habitat: "森林" },
+            { no: 50, name: "ディグダ", type: "じめん", sprite: "🐹", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "洞窟" },
+            { no: 51, name: "ダグトリオ", type: "じめん", sprite: "🐹", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "小", weight: "軽", habitat: "洞窟" },
+            { no: 52, name: "ニャース", type: "ノーマル", sprite: "🐱", generation: 1, stage: "初期", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "都市" },
+            { no: 53, name: "ペルシアン", type: "ノーマル", sprite: "🐱", generation: 1, stage: "最終", color: "白", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "都市" },
+            { no: 54, name: "コダック", type: "みず", sprite: "🦆", generation: 1, stage: "初期", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "水辺" },
+            { no: 55, name: "ゴルダック", type: "みず", sprite: "🦆", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "水辺" },
+            { no: 56, name: "マンキー", type: "かくとう", sprite: "🐵", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "山地" },
+            { no: 57, name: "オコリザル", type: "かくとう", sprite: "🐵", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "山地" },
+            { no: 58, name: "ガーディ", type: "ほのお", sprite: "🐕", generation: 1, stage: "初期", color: "赤", pattern: "しま", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 59, name: "ウインディ", type: "ほのお", sprite: "🐕", generation: 1, stage: "最終", color: "赤", pattern: "しま", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 60, name: "ニョロモ", type: "みず", sprite: "🐸", generation: 1, stage: "初期", color: "青", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "水辺" },
+            { no: 61, name: "ニョロゾ", type: "みず", sprite: "🐸", generation: 1, stage: "中間", color: "青", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "水辺" },
+            { no: 62, name: "ニョロボン", type: "みず・かくとう", sprite: "🐸", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "水辺" },
+            { no: 63, name: "ケーシィ", type: "エスパー", sprite: "🦊", generation: 1, stage: "初期", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "都市" },
+            { no: 64, name: "ユンゲラー", type: "エスパー", sprite: "🦊", generation: 1, stage: "中間", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "都市" },
+            { no: 65, name: "フーディン", type: "エスパー", sprite: "🦊", generation: 1, stage: "最終", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "都市" },
+            { no: 66, name: "ワンリキー", type: "かくとう", sprite: "💪", generation: 1, stage: "初期", color: "灰", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "中", habitat: "山地" },
+            { no: 67, name: "ゴーリキー", type: "かくとう", sprite: "💪", generation: 1, stage: "中間", color: "灰", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "大", weight: "重", habitat: "山地" },
+            { no: 68, name: "カイリキー", type: "かくとう", sprite: "💪", generation: 1, stage: "最終", color: "灰", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "山地" },
+            { no: 69, name: "マダツボミ", type: "くさ・どく", sprite: "🌱", generation: 1, stage: "初期", color: "緑", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "草原" },
+            { no: 70, name: "ウツドン", type: "くさ・どく", sprite: "🌿", generation: 1, stage: "中間", color: "緑", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "軽", habitat: "草原" },
+            { no: 71, name: "ウツボット", type: "くさ・どく", sprite: "🪴", generation: 1, stage: "最終", color: "緑", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "草原" },
+            { no: 72, name: "メノクラゲ", type: "みず・どく", sprite: "🪼", generation: 1, stage: "初期", color: "青", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "軽", habitat: "海" },
+            { no: 73, name: "ドククラゲ", type: "みず・どく", sprite: "🪼", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "海" },
+            { no: 74, name: "イシツブテ", type: "いわ・じめん", sprite: "🪨", generation: 1, stage: "初期", color: "灰", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "中", habitat: "山地" },
+            { no: 75, name: "ゴローン", type: "いわ・じめん", sprite: "🪨", generation: 1, stage: "中間", color: "灰", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "重", habitat: "山地" },
+            { no: 76, name: "ゴローニャ", type: "いわ・じめん", sprite: "🪨", generation: 1, stage: "最終", color: "灰", pattern: "甲羅", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "山地" },
+            { no: 77, name: "ポニータ", type: "ほのお", sprite: "🐴", generation: 1, stage: "初期", color: "白", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "草原" },
+            { no: 78, name: "ギャロップ", type: "ほのお", sprite: "🐴", generation: 1, stage: "最終", color: "白", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 79, name: "ヤドン", type: "みず・エスパー", sprite: "🦛", generation: 1, stage: "初期", color: "ピンク", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "水辺" },
+            { no: 80, name: "ヤドラン", type: "みず・エスパー", sprite: "🦛", generation: 1, stage: "最終", color: "ピンク", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "水辺" },
+            { no: 81, name: "コイル", type: "でんき・はがね", sprite: "🧲", generation: 1, stage: "初期", color: "灰", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: true, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "都市" },
+            { no: 82, name: "レアコイル", type: "でんき・はがね", sprite: "🧲", generation: 1, stage: "最終", color: "灰", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: true, legendary: false, evolves: false, size: "中", weight: "重", habitat: "都市" },
+            { no: 83, name: "カモネギ", type: "ノーマル・ひこう", sprite: "🦆", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: false, evolves: false, size: "中", weight: "軽", habitat: "草原" },
+            { no: 84, name: "ドードー", type: "ノーマル・ひこう", sprite: "🦤", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "草原" },
+            { no: 85, name: "ドードリオ", type: "ノーマル・ひこう", sprite: "🦤", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 86, name: "パウワウ", type: "みず", sprite: "🦭", generation: 1, stage: "初期", color: "白", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "海" },
+            { no: 87, name: "ジュゴン", type: "みず・こおり", sprite: "🦭", generation: 1, stage: "最終", color: "白", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "海" },
+            { no: 88, name: "ベトベター", type: "どく", sprite: "💩", generation: 1, stage: "初期", color: "紫", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "都市" },
+            { no: 89, name: "ベトベトン", type: "どく", sprite: "💩", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "都市" },
+            { no: 90, name: "シェルダー", type: "みず", sprite: "🐚", generation: 1, stage: "初期", color: "紫", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "海" },
+            { no: 91, name: "パルシェン", type: "みず・こおり", sprite: "🐚", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "海" },
+            { no: 92, name: "ゴース", type: "ゴースト・どく", sprite: "👻", generation: 1, stage: "初期", color: "紫", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: true, legendary: false, evolves: true, size: "中", weight: "軽", habitat: "都市" },
+            { no: 93, name: "ゴースト", type: "ゴースト・どく", sprite: "👻", generation: 1, stage: "中間", color: "紫", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: true, legendary: false, evolves: true, size: "大", weight: "軽", habitat: "都市" },
+            { no: 94, name: "ゲンガー", type: "ゴースト・どく", sprite: "👻", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "都市" },
+            { no: 95, name: "イワーク", type: "いわ・じめん", sprite: "🐍", generation: 1, stage: "最終", color: "灰", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "洞窟" },
+            { no: 96, name: "スリープ", type: "エスパー", sprite: "🐘", generation: 1, stage: "初期", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "中", habitat: "草原" },
+            { no: 97, name: "スリーパー", type: "エスパー", sprite: "🐘", generation: 1, stage: "最終", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 98, name: "クラブ", type: "みず", sprite: "🦀", generation: 1, stage: "初期", color: "赤", pattern: "無地", limbs: 6, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "海" },
+            { no: 99, name: "キングラー", type: "みず", sprite: "🦀", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 6, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "海" },
+            { no: 100, name: "ビリリダマ", type: "でんき", sprite: "⚡", generation: 1, stage: "初期", color: "赤", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "都市" },
+            { no: 101, name: "マルマイン", type: "でんき", sprite: "⚡", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "都市" },
+            { no: 102, name: "タマタマ", type: "くさ・エスパー", sprite: "🥚", generation: 1, stage: "初期", color: "ピンク", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "森林" },
+            { no: 103, name: "ナッシー", type: "くさ・エスパー", sprite: "🌴", generation: 1, stage: "最終", color: "黄", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "森林" },
+            { no: 104, name: "カラカラ", type: "じめん", sprite: "💀", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "山地" },
+            { no: 105, name: "ガラガラ", type: "じめん", sprite: "💀", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "山地" },
+            { no: 106, name: "サワムラー", type: "かくとう", sprite: "🥋", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 2, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "都市" },
+            { no: 107, name: "エビワラー", type: "かくとう", sprite: "🥊", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "都市" },
+            { no: 108, name: "ベロリンガ", type: "ノーマル", sprite: "👅", generation: 1, stage: "最終", color: "ピンク", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "草原" },
+            { no: 109, name: "ドガース", type: "どく", sprite: "☁️", generation: 1, stage: "初期", color: "紫", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: true, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "都市" },
+            { no: 110, name: "マタドガス", type: "どく", sprite: "☁️", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: true, legendary: false, evolves: false, size: "大", weight: "中", habitat: "都市" },
+            { no: 111, name: "サイホーン", type: "じめん・いわ", sprite: "🦏", generation: 1, stage: "初期", color: "灰", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "重", habitat: "山地" },
+            { no: 112, name: "サイドン", type: "じめん・いわ", sprite: "🦏", generation: 1, stage: "最終", color: "灰", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "山地" },
+            { no: 113, name: "ラッキー", type: "ノーマル", sprite: "🥚", generation: 1, stage: "最終", color: "ピンク", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "重", habitat: "草原" },
+            { no: 114, name: "モンジャラ", type: "くさ", sprite: "🌿", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 2, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "草原" },
+            { no: 115, name: "ガルーラ", type: "ノーマル", sprite: "🦘", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 116, name: "タッツー", type: "みず", sprite: "🐴", generation: 1, stage: "初期", color: "青", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "海" },
+            { no: 117, name: "シードラ", type: "みず", sprite: "🐴", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "海" },
+            { no: 118, name: "トサキント", type: "みず", sprite: "🐟", generation: 1, stage: "初期", color: "赤", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "水辺" },
+            { no: 119, name: "アズマオウ", type: "みず", sprite: "🐟", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "水辺" },
+            { no: 120, name: "ヒトデマン", type: "みず", sprite: "⭐", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 5, tail: false, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "海" },
+            { no: 121, name: "スターミー", type: "みず・エスパー", sprite: "⭐", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 10, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "海" },
+            { no: 122, name: "バリヤード", type: "エスパー・フェアリー", sprite: "🤡", generation: 1, stage: "最終", color: "ピンク", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "都市" },
+            { no: 123, name: "ストライク", type: "むし・ひこう", sprite: "🦗", generation: 1, stage: "最終", color: "緑", pattern: "無地", limbs: 4, tail: false, wings: true, canFly: true, legendary: false, evolves: false, size: "大", weight: "中", habitat: "森林" },
+            { no: 124, name: "ルージュラ", type: "こおり・エスパー", sprite: "💋", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "洞窟" },
+            { no: 125, name: "エレブー", type: "でんき", sprite: "⚡", generation: 1, stage: "最終", color: "黄", pattern: "しま", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "都市" },
+            { no: 126, name: "ブーバー", type: "ほのお", sprite: "🔥", generation: 1, stage: "最終", color: "赤", pattern: "しま", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "山地" },
+            { no: 127, name: "カイロス", type: "むし", sprite: "🪲", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 6, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "中", habitat: "森林" },
+            { no: 128, name: "ケンタロス", type: "ノーマル", sprite: "🐂", generation: 1, stage: "最終", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "草原" },
+            { no: 129, name: "コイキング", type: "みず", sprite: "🐟", generation: 1, stage: "初期", color: "赤", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "中", weight: "軽", habitat: "水辺" },
+            { no: 130, name: "ギャラドス", type: "みず・ひこう", sprite: "🐉", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: true, legendary: false, evolves: false, size: "大", weight: "重", habitat: "水辺" },
+            { no: 131, name: "ラプラス", type: "みず・こおり", sprite: "🦕", generation: 1, stage: "最終", color: "青", pattern: "甲羅", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "海" },
+            { no: 132, name: "メタモン", type: "ノーマル", sprite: "🟣", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 0, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "小", weight: "軽", habitat: "都市" },
+            { no: 133, name: "イーブイ", type: "ノーマル", sprite: "🦊", generation: 1, stage: "初期", color: "茶", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "都市" },
+            { no: 134, name: "シャワーズ", type: "みず", sprite: "🦊", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "水辺" },
+            { no: 135, name: "サンダース", type: "でんき", sprite: "🦊", generation: 1, stage: "最終", color: "黄", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "都市" },
+            { no: 136, name: "ブースター", type: "ほのお", sprite: "🦊", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "草原" },
+            { no: 137, name: "ポリゴン", type: "ノーマル", sprite: "🔷", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "小", weight: "軽", habitat: "都市" },
+            { no: 138, name: "オムナイト", type: "いわ・みず", sprite: "🐚", generation: 1, stage: "初期", color: "青", pattern: "甲羅", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "海" },
+            { no: 139, name: "オムスター", type: "いわ・みず", sprite: "🐙", generation: 1, stage: "最終", color: "青", pattern: "甲羅", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "中", weight: "中", habitat: "海" },
+            { no: 140, name: "カブト", type: "いわ・みず", sprite: "🪲", generation: 1, stage: "初期", color: "茶", pattern: "甲羅", limbs: 6, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "小", weight: "軽", habitat: "海" },
+            { no: 141, name: "カブトプス", type: "いわ・みず", sprite: "🦂", generation: 1, stage: "最終", color: "茶", pattern: "甲羅", limbs: 4, tail: true, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "海" },
+            { no: 142, name: "プテラ", type: "いわ・ひこう", sprite: "🦇", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: false, evolves: false, size: "大", weight: "中", habitat: "山地" },
+            { no: 143, name: "カビゴン", type: "ノーマル", sprite: "😴", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 4, tail: false, wings: false, canFly: false, legendary: false, evolves: false, size: "大", weight: "重", habitat: "山地" },
+            { no: 144, name: "フリーザー", type: "こおり・ひこう", sprite: "🐦", generation: 1, stage: "最終", color: "青", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: true, evolves: false, size: "大", weight: "中", habitat: "山地" },
+            { no: 145, name: "サンダー", type: "でんき・ひこう", sprite: "🦅", generation: 1, stage: "最終", color: "黄", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: true, evolves: false, size: "大", weight: "中", habitat: "都市" },
+            { no: 146, name: "ファイヤー", type: "ほのお・ひこう", sprite: "🔥", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 2, tail: true, wings: true, canFly: true, legendary: true, evolves: false, size: "大", weight: "中", habitat: "山地" },
+            { no: 147, name: "ミニリュウ", type: "ドラゴン", sprite: "🐉", generation: 1, stage: "初期", color: "青", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: false, legendary: false, evolves: true, size: "大", weight: "軽", habitat: "水辺" },
+            { no: 148, name: "ハクリュー", type: "ドラゴン", sprite: "🐉", generation: 1, stage: "中間", color: "青", pattern: "無地", limbs: 0, tail: true, wings: false, canFly: true, legendary: false, evolves: true, size: "大", weight: "中", habitat: "水辺" },
+            { no: 149, name: "カイリュー", type: "ドラゴン・ひこう", sprite: "🐉", generation: 1, stage: "最終", color: "赤", pattern: "無地", limbs: 4, tail: true, wings: true, canFly: true, legendary: false, evolves: false, size: "大", weight: "重", habitat: "水辺" },
+            { no: 150, name: "ミュウツー", type: "エスパー", sprite: "😼", generation: 1, stage: "最終", color: "紫", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: true, legendary: true, evolves: false, size: "大", weight: "重", habitat: "洞窟" },
+            { no: 151, name: "ミュウ", type: "エスパー", sprite: "😺", generation: 1, stage: "最終", color: "ピンク", pattern: "無地", limbs: 4, tail: true, wings: false, canFly: true, legendary: true, evolves: false, size: "小", weight: "軽", habitat: "森林" }
+        ];
+
+        // なぞなぞデータ
+        const riddles = {
+            easy: [
+                { question: "でんきタイプで、ほっぺが<ruby>赤<rt>あか</rt></ruby>くて、ピカピカ<ruby>光<rt>ひか</rt></ruby>るポケモンは？", answer: "ピカチュウ", choices: ["ピカチュウ", "ライチュウ", "サンダース", "エレブー"], hint: "みんなの<ruby>人気者<rt>にんきもの</rt></ruby>！" },
+                { question: "<ruby>炎<rt>ほのお</rt></ruby>をふいて、<ruby>背中<rt>せなか</rt></ruby>につばさがあって、オレンジ<ruby>色<rt>いろ</rt></ruby>のドラゴンは？", answer: "リザードン", choices: ["リザードン", "ギャラドス", "カイリュー", "プテラ"], hint: "<ruby>最初<rt>さいしょ</rt></ruby>の3<ruby>匹<rt>ひき</rt></ruby>の<ruby>進化形<rt>しんかけい</rt></ruby>" },
+                { question: "みずタイプで、こうらがあって、<ruby>背中<rt>せなか</rt></ruby>に<ruby>大砲<rt>たいほう</rt></ruby>があるポケモンは？", answer: "カメックス", choices: ["カメックス", "ラプラス", "カブトプス", "シェルダー"], hint: "ゼニガメの<ruby>最終進化<rt>さいしゅうしんか</rt></ruby>" },
+                { question: "いつも<ruby>寝<rt>ね</rt></ruby>ていて、とても<ruby>大<rt>おお</rt></ruby>きくて、<ruby>道<rt>みち</rt></ruby>をふさいでいるポケモンは？", answer: "カビゴン", choices: ["カビゴン", "ヤドン", "ベトベトン", "ラッキー"], hint: "<ruby>起<rt>お</rt></ruby>こすにはポケモンのふえが<ruby>必要<rt>ひつよう</rt></ruby>" },
+                { question: "<ruby>変身<rt>へんしん</rt></ruby>できて、どんなポケモンにもなれる<ruby>紫色<rt>むらさきいろ</rt></ruby>のポケモンは？", answer: "メタモン", choices: ["メタモン", "ゴース", "ベトベター", "ドガース"], hint: "へんしんポケモン" },
+                { question: "<ruby>赤<rt>あか</rt></ruby>くて<ruby>弱<rt>よわ</rt></ruby>くて、<ruby>水<rt>みず</rt></ruby>の<ruby>中<rt>なか</rt></ruby>でピチピチはねているポケモンは？", answer: "コイキング", choices: ["コイキング", "トサキント", "タッツー", "パウワウ"], hint: "<ruby>進化<rt>しんか</rt></ruby>すると<ruby>超強<rt>ちょうつよ</rt></ruby>くなる" },
+                { question: "<ruby>伝説<rt>でんせつ</rt></ruby>の<ruby>鳥<rt>とり</rt></ruby>ポケモンで、こおりタイプで、<ruby>青<rt>あお</rt></ruby>い<ruby>色<rt>いろ</rt></ruby>をしているのは？", answer: "フリーザー", choices: ["フリーザー", "サンダー", "ファイヤー", "ラプラス"], hint: "3<ruby>鳥<rt>とり</rt></ruby>の1<ruby>匹<rt>ひき</rt></ruby>" },
+                { question: "エスパータイプで、スプーンを<ruby>持<rt>も</rt></ruby>っていて、<ruby>黄色<rt>きいろ</rt></ruby>いポケモンは？", answer: "フーディン", choices: ["フーディン", "ユンゲラー", "ケーシィ", "スリーパー"], hint: "IQ5000のポケモン" },
+                { question: "ピンク<ruby>色<rt>いろ</rt></ruby>で、<ruby>歌<rt>うた</rt></ruby>うと<ruby>相手<rt>あいて</rt></ruby>を<ruby>眠<rt>ねむ</rt></ruby>らせてしまうポケモンは？", answer: "プリン", choices: ["プリン", "ピッピ", "ラッキー", "ピクシー"], hint: "<ruby>歌<rt>うた</rt></ruby>うポケモン" },
+                { question: "くさタイプで、<ruby>背中<rt>せなか</rt></ruby>に<ruby>大<rt>おお</rt></ruby>きな<ruby>花<rt>はな</rt></ruby>が<ruby>咲<rt>さ</rt></ruby>いているポケモンは？", answer: "フシギバナ", choices: ["フシギバナ", "ラフレシア", "ナッシー", "ウツボット"], hint: "フシギダネの<ruby>最終進化<rt>さいしゅうしんか</rt></ruby>" }
+            ],
+            normal: [
+                { question: "このポケモンは<ruby>進化<rt>しんか</rt></ruby>すると<ruby>体<rt>からだ</rt></ruby>が3つに<ruby>分<rt>わ</rt></ruby>かれます。じめんタイプです", answer: "ダグトリオ", choices: ["ダグトリオ", "ドードリオ", "ディグダ", "イシツブテ"], hint: "あな<ruby>掘<rt>ほ</rt></ruby>りが<ruby>得意<rt>とくい</rt></ruby>" },
+                { question: "むしタイプで、かまのような<ruby>腕<rt>うで</rt></ruby>を<ruby>持<rt>も</rt></ruby>ち、とても<ruby>速<rt>はや</rt></ruby>く<ruby>動<rt>うご</rt></ruby>けるポケモンは？", answer: "ストライク", choices: ["ストライク", "カイロス", "スピアー", "パラセクト"], hint: "<ruby>緑色<rt>みどりいろ</rt></ruby>の<ruby>忍者<rt>にんじゃ</rt></ruby>のような<ruby>見<rt>み</rt></ruby>た<ruby>目<rt>め</rt></ruby>" },
+                { question: "かくとうタイプで、4<ruby>本<rt>ほん</rt></ruby>の<ruby>腕<rt>うで</rt></ruby>を<ruby>持<rt>も</rt></ruby>ち、ちから<ruby>持<rt>も</rt></ruby>ちのポケモンは？", answer: "カイリキー", choices: ["カイリキー", "ゴーリキー", "ワンリキー", "サワムラー"], hint: "<ruby>怪力<rt>かいりき</rt></ruby>ポケモン" },
+                { question: "でんきタイプとはがねタイプを<ruby>持<rt>も</rt></ruby>ち、じしゃくのような<ruby>見<rt>み</rt></ruby>た<ruby>目<rt>め</rt></ruby>のポケモンは？", answer: "レアコイル", choices: ["レアコイル", "コイル", "ビリリダマ", "マルマイン"], hint: "3つの<ruby>目<rt>め</rt></ruby>がある" },
+                { question: "いわタイプで、とぐろを<ruby>巻<rt>ま</rt></ruby>いていて、とても<ruby>大<rt>おお</rt></ruby>きいヘビのようなポケモンは？", answer: "イワーク", choices: ["イワーク", "アーボック", "ハクリュー", "ギャラドス"], hint: "<ruby>体<rt>からだ</rt></ruby>が<ruby>岩<rt>いわ</rt></ruby>でできている" },
+                { question: "ゴーストタイプで、かげから<ruby>現<rt>あらわ</rt></ruby>れて、<ruby>進化<rt>しんか</rt></ruby>すると<ruby>手<rt>て</rt></ruby>が<ruby>生<rt>は</rt></ruby>えるポケモンは？", answer: "ゴースト", choices: ["ゴースト", "ゴース", "ゲンガー", "ムウマ"], hint: "ゴースの<ruby>進化形<rt>しんかけい</rt></ruby>" },
+                { question: "みずタイプで、くちばしを<ruby>持<rt>も</rt></ruby>ち、<ruby>頭痛持<rt>ずつうも</rt></ruby>ちの<ruby>黄色<rt>きいろ</rt></ruby>いポケモンは？", answer: "コダック", choices: ["コダック", "ゴルダック", "カモネギ", "ポッポ"], hint: "いつも<ruby>頭<rt>あたま</rt></ruby>を<ruby>抱<rt>かか</rt></ruby>えている" },
+                { question: "このポケモンは<ruby>進化<rt>しんか</rt></ruby>の<ruby>石<rt>いし</rt></ruby>で3<ruby>種類<rt>しゅるい</rt></ruby>に<ruby>進化<rt>しんか</rt></ruby>できます。<ruby>茶色<rt>ちゃいろ</rt></ruby>くてかわいい", answer: "イーブイ", choices: ["イーブイ", "ピッピ", "ロコン", "ガーディ"], hint: "しんかポケモン" },
+                { question: "どくタイプで、ヘドロでできていて、<ruby>紫色<rt>むらさきいろ</rt></ruby>のポケモンは？", answer: "ベトベター", choices: ["ベトベター", "ベトベトン", "ドガース", "マタドガス"], hint: "<ruby>汚染<rt>おせん</rt></ruby>された<ruby>水<rt>みず</rt></ruby>から<ruby>生<rt>う</rt></ruby>まれた" },
+                { question: "ひこうタイプだけど<ruby>空<rt>そら</rt></ruby>を<ruby>飛<rt>と</rt></ruby>べない。<ruby>首<rt>くび</rt></ruby>が3つあるポケモンは？", answer: "ドードリオ", choices: ["ドードリオ", "ドードー", "オニドリル", "ポッポ"], hint: "ダチョウみたいな<ruby>見<rt>み</rt></ruby>た<ruby>目<rt>め</rt></ruby>" },
+                { question: "くさタイプで、つぼみの<ruby>形<rt>かたち</rt></ruby>をしていて、すっぱそうな<ruby>顔<rt>かお</rt></ruby>のポケモンは？", answer: "クサイハナ", choices: ["クサイハナ", "ナゾノクサ", "ラフレシア", "マダツボミ"], hint: "くさいにおいを<ruby>出<rt>だ</rt></ruby>す" },
+                { question: "ほのおタイプで、しっぽの<ruby>先<rt>さき</rt></ruby>に<ruby>火<rt>ひ</rt></ruby>が<ruby>灯<rt>とも</rt></ruby>っているトカゲのポケモンは？", answer: "ヒトカゲ", choices: ["ヒトカゲ", "リザード", "ロコン", "ガーディ"], hint: "<ruby>最初<rt>さいしょ</rt></ruby>の3<ruby>匹<rt>ひき</rt></ruby>の1<ruby>匹<rt>ひき</rt></ruby>" },
+                { question: "エスパータイプで、<ruby>夢<rt>ゆめ</rt></ruby>を<ruby>食<rt>た</rt></ruby>べると<ruby>言<rt>い</rt></ruby>われているポケモンは？", answer: "スリープ", choices: ["スリープ", "スリーパー", "ケーシィ", "ムンナ"], hint: "バクに<ruby>似<rt>に</rt></ruby>ている" },
+                { question: "こおりタイプで、アザラシのような<ruby>見<rt>み</rt></ruby>た<ruby>目<rt>め</rt></ruby>のポケモンは？", answer: "ジュゴン", choices: ["ジュゴン", "パウワウ", "ラプラス", "シェルダー"], hint: "パウワウの<ruby>進化形<rt>しんかけい</rt></ruby>" },
+                { question: "ドラゴンタイプで、<ruby>青<rt>あお</rt></ruby>くて<ruby>細長<rt>ほそなが</rt></ruby>い<ruby>体<rt>からだ</rt></ruby>をしているポケモンは？", answer: "ミニリュウ", choices: ["ミニリュウ", "ハクリュー", "カイリュー", "タッツー"], hint: "<ruby>伝説<rt>でんせつ</rt></ruby>のドラゴンの<ruby>進化前<rt>しんかまえ</rt></ruby>" },
+                { question: "かくとうタイプで、キックが<ruby>得意<rt>とくい</rt></ruby>な<ruby>茶色<rt>ちゃいろ</rt></ruby>いポケモンは？", answer: "サワムラー", choices: ["サワムラー", "エビワラー", "マンキー", "オコリザル"], hint: "<ruby>足<rt>あし</rt></ruby>が<ruby>伸<rt>の</rt></ruby>びる" },
+                { question: "ほのおタイプで、<ruby>白<rt>しろ</rt></ruby>い<ruby>馬<rt>うま</rt></ruby>の<ruby>形<rt>かたち</rt></ruby>をしているポケモンは？", answer: "ポニータ", choices: ["ポニータ", "ギャロップ", "ケンタロス", "ガーディ"], hint: "たてがみが<ruby>炎<rt>ほのお</rt></ruby>" },
+                { question: "フェアリータイプで、ピンク<ruby>色<rt>いろ</rt></ruby>で、<ruby>卵<rt>たまご</rt></ruby>を<ruby>持<rt>も</rt></ruby>っているポケモンは？", answer: "ラッキー", choices: ["ラッキー", "ピッピ", "プリン", "ピクシー"], hint: "しあわせポケモン" },
+                { question: "むしタイプで、まゆの<ruby>形<rt>かたち</rt></ruby>をしていて、<ruby>緑色<rt>みどりいろ</rt></ruby>のポケモンは？", answer: "トランセル", choices: ["トランセル", "コクーン", "キャタピー", "ビードル"], hint: "キャタピーの<ruby>進化形<rt>しんかけい</rt></ruby>" },
+                { question: "でんきタイプで、モンスターボールに<ruby>似<rt>に</rt></ruby>ている<ruby>丸<rt>まる</rt></ruby>いポケモンは？", answer: "ビリリダマ", choices: ["ビリリダマ", "マルマイン", "コイル", "ピカチュウ"], hint: "<ruby>爆発<rt>ばくはつ</rt></ruby>する" }
+            ],
+            hard: [
+                { question: "No.001のポケモンは？", answer: "フシギダネ", choices: ["フシギダネ", "ヒトカゲ", "ゼニガメ", "ピカチュウ"], hint: "<ruby>図鑑<rt>ずかん</rt></ruby>の<ruby>最初<rt>さいしょ</rt></ruby>" },
+                { question: "ライチュウの<ruby>進化前<rt>しんかまえ</rt></ruby>の<ruby>進化前<rt>しんかまえ</rt></ruby>のポケモンは？", answer: "ピチュー", choices: ["ピチュー", "ピカチュウ", "ピッピ", "トゲピー"], hint: "<ruby>第二世代<rt>だいにせだい</rt></ruby>で<ruby>追加<rt>ついか</rt></ruby>された" },
+                { question: "カブトとオムナイト、どちらが<ruby>先<rt>さき</rt></ruby>に<ruby>図鑑<rt>ずかん</rt></ruby>に<ruby>載<rt>の</rt></ruby>っている？", answer: "オムナイト", choices: ["オムナイト", "カブト", "おなじ", "どちらもない"], hint: "<ruby>図鑑番号<rt>ずかんばんごう</rt></ruby>を<ruby>比較<rt>ひかく</rt></ruby>" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>唯一<rt>ゆいいつ</rt></ruby>、ノーマル・ひこうタイプでネギを<ruby>持<rt>も</rt></ruby>っているポケモンは？", answer: "カモネギ", choices: ["カモネギ", "ポッポ", "ピジョン", "オニスズメ"], hint: "カモがネギを<ruby>背負<rt>せお</rt></ruby>って<ruby>来<rt>く</rt></ruby>る" },
+                { question: "<ruby>進化<rt>しんか</rt></ruby>の<ruby>石<rt>いし</rt></ruby>を<ruby>使<rt>つか</rt></ruby>わずに、<ruby>通信交換<rt>つうしんこうかん</rt></ruby>で<ruby>進化<rt>しんか</rt></ruby>するポケモンではないのは？", answer: "ピカチュウ", choices: ["ピカチュウ", "ゴーリキー", "ユンゲラー", "ゴースト"], hint: "かみなりの<ruby>石<rt>いし</rt></ruby>が<ruby>必要<rt>ひつよう</rt></ruby>" },
+                { question: "5<ruby>本<rt>ほん</rt></ruby>の<ruby>足<rt>あし</rt></ruby>を<ruby>持<rt>も</rt></ruby>つヒトデのポケモンは？", answer: "ヒトデマン", choices: ["ヒトデマン", "スターミー", "オムスター", "タッツー"], hint: "スターミーは10<ruby>本<rt>ほん</rt></ruby>" },
+                { question: "このポケモンは2つの<ruby>形<rt>かたち</rt></ruby>があります。オスとメスで<ruby>違<rt>ちが</rt></ruby>うポケモン", answer: "ニドラン", choices: ["ニドラン", "ピカチュウ", "イーブイ", "ミュウ"], hint: "♂と♀で<ruby>別<rt>べつ</rt></ruby>ポケモン<ruby>扱<rt>あつか</rt></ruby>い" },
+                { question: "<ruby>唯一<rt>ゆいいつ</rt></ruby>、エスパー・かくとうタイプを<ruby>持<rt>も</rt></ruby>つ<ruby>第<rt>だい</rt></ruby>1<ruby>世代<rt>せだい</rt></ruby>のポケモンは？", answer: "なし", choices: ["なし", "フーディン", "バリヤード", "ニョロボン"], hint: "じつは<ruby>存在<rt>そんざい</rt></ruby>しない" },
+                { question: "<ruby>背中<rt>せなか</rt></ruby>にキノコが<ruby>生<rt>は</rt></ruby>えているむしポケモンは？", answer: "パラス", choices: ["パラス", "パラセクト", "タマタマ", "コンパン"], hint: "パラセクトの<ruby>進化前<rt>しんかまえ</rt></ruby>" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>でノーマルタイプを<ruby>持<rt>も</rt></ruby>つ<ruby>伝説<rt>でんせつ</rt></ruby>のポケモンは？", answer: "そんざいしない", choices: ["そんざいしない", "ミュウ", "ミュウツー", "フリーザー"], hint: "<ruby>全員<rt>ぜんいん</rt></ruby>エスパー" },
+                { question: "<ruby>図鑑<rt>ずかん</rt></ruby>No.100のポケモンは？", answer: "ビリリダマ", choices: ["ビリリダマ", "マルマイン", "コイル", "ピカチュウ"], hint: "キリばん" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>最<rt>もっと</rt></ruby>も<ruby>重<rt>おも</rt></ruby>いポケモンは？", answer: "カビゴン", choices: ["カビゴン", "ギャラドス", "ラプラス", "ゴローニャ"], hint: "460kg" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>最<rt>もっと</rt></ruby>も<ruby>軽<rt>かる</rt></ruby>いポケモンは？", answer: "ディグダ", choices: ["ディグダ", "ヒトデマン", "コイキング", "ピチュー"], hint: "0.8kg" },
+                { question: "ほのお・ひこうタイプを<ruby>持<rt>も</rt></ruby>つポケモンは<ruby>初代<rt>しょだい</rt></ruby>に<ruby>何匹<rt>なんびき</rt></ruby>いる？", answer: "2<ruby>匹<rt>ひき</rt></ruby>", choices: ["2<ruby>匹<rt>ひき</rt></ruby>", "1<ruby>匹<rt>ひき</rt></ruby>", "3<ruby>匹<rt>ひき</rt></ruby>", "4<ruby>匹<rt>ひき</rt></ruby>"], hint: "リザードンとファイヤー" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>最<rt>もっと</rt></ruby>もHPが<ruby>高<rt>たか</rt></ruby>いポケモンは？", answer: "ラッキー", choices: ["ラッキー", "カビゴン", "ニョロボン", "ギャラドス"], hint: "HP255" },
+                { question: "ゴーストタイプの<ruby>弱点<rt>じゃくてん</rt></ruby>は？", answer: "ゴースト", choices: ["ゴースト", "エスパー", "ノーマル", "あく"], hint: "<ruby>初代<rt>しょだい</rt></ruby>ではバグあり" },
+                { question: "シルフカンパニーの<ruby>社長<rt>しゃちょう</rt></ruby>が<ruby>持<rt>も</rt></ruby>っているポケモンは？", answer: "ペルシアン", choices: ["ペルシアン", "ニャース", "ラッキー", "イーブイ"], hint: "ロケット<ruby>団<rt>だん</rt></ruby>のボスも<ruby>持<rt>も</rt></ruby>っている" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>最<rt>もっと</rt></ruby>も<ruby>素早<rt>すばや</rt></ruby>いポケモンは？", answer: "マルマイン", choices: ["マルマイン", "サンダース", "ペルシアン", "ピジョット"], hint: "<ruby>素早<rt>すばや</rt></ruby>さ140" },
+                { question: "タマゴグループが「<ruby>未発見<rt>みはっけん</rt></ruby>」のポケモンは？", answer: "でんせつのポケモン", choices: ["でんせつのポケモン", "ベイビィポケモン", "メタモン", "ぜんぶ"], hint: "<ruby>初代<rt>しょだい</rt></ruby>ではたまごシステムなし" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で「はかいこうせん」を<ruby>自力<rt>じりき</rt></ruby>で<ruby>覚<rt>おぼ</rt></ruby>えられないのは？", answer: "ピカチュウ", choices: ["ピカチュウ", "リザードン", "カメックス", "フシギバナ"], hint: "わざマシンのみ" },
+                { question: "ゲームボーイの<ruby>初代<rt>しょだい</rt></ruby>ポケモン、<ruby>日本<rt>にほん</rt></ruby>での<ruby>発売日<rt>はつばいび</rt></ruby>は？", answer: "1996<ruby>年<rt>ねん</rt></ruby>", choices: ["1996<ruby>年<rt>ねん</rt></ruby>", "1995<ruby>年<rt>ねん</rt></ruby>", "1997<ruby>年<rt>ねん</rt></ruby>", "1998<ruby>年<rt>ねん</rt></ruby>"], hint: "<ruby>平成<rt>へいせい</rt></ruby>8<ruby>年<rt>ねん</rt></ruby>" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>最<rt>もっと</rt></ruby>も<ruby>攻撃力<rt>こうげきりょく</rt></ruby>が<ruby>高<rt>たか</rt></ruby>いポケモンは？", answer: "カイリキー", choices: ["カイリキー", "カイリュー", "ギャラドス", "ケンタロス"], hint: "かくとうタイプ" },
+                { question: "<ruby>進化<rt>しんか</rt></ruby>すると<ruby>足<rt>あし</rt></ruby>が<ruby>消<rt>き</rt></ruby>えるポケモンは？", answer: "ニョロボン", choices: ["ニョロボン", "ゴローニャ", "ゴルダック", "ギャラドス"], hint: "ニョロゾの<ruby>進化形<rt>しんかけい</rt></ruby>" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>最<rt>もっと</rt></ruby>も<ruby>特殊<rt>とくしゅ</rt></ruby>が<ruby>高<rt>たか</rt></ruby>いポケモンは？", answer: "ミュウツー", choices: ["ミュウツー", "フーディン", "スターミー", "サンダー"], hint: "154" },
+                { question: "「10まんボルト」を<ruby>自力<rt>じりき</rt></ruby>で<ruby>覚<rt>おぼ</rt></ruby>えるでんきタイプではないポケモンは？", answer: "ピカチュウ", choices: ["ピカチュウ", "サンダース", "レアコイル", "エレブー"], hint: "わざマシンで<ruby>覚<rt>おぼ</rt></ruby>える" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で「なみのり」を<ruby>覚<rt>おぼ</rt></ruby>えられないみずタイプのポケモンは？", answer: "メノクラゲ", choices: ["メノクラゲ", "コイキング", "タッツー", "シェルダー"], hint: "クラゲは<ruby>泳<rt>およ</rt></ruby>がない" },
+                { question: "ポケモン<ruby>図鑑<rt>ずかん</rt></ruby>の<ruby>完成<rt>かんせい</rt></ruby>に<ruby>必要<rt>ひつよう</rt></ruby>な<ruby>最低限<rt>さいていげん</rt></ruby>の<ruby>匹数<rt>ひきすう</rt></ruby>は？", answer: "150<ruby>匹<rt>ひき</rt></ruby>", choices: ["150<ruby>匹<rt>ひき</rt></ruby>", "151<ruby>匹<rt>ひき</rt></ruby>", "149<ruby>匹<rt>ひき</rt></ruby>", "148<ruby>匹<rt>ひき</rt></ruby>"], hint: "ミュウは<ruby>不要<rt>ふよう</rt></ruby>" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>唯一<rt>ゆいいつ</rt></ruby>タイプが1つだけの<ruby>伝説<rt>でんせつ</rt></ruby>のポケモンは？", answer: "そんざいしない", choices: ["そんざいしない", "ミュウ", "ミュウツー", "サンダー"], hint: "<ruby>全員複合<rt>ぜんいんふくごう</rt></ruby>タイプ" },
+                { question: "「りゅうのいかり」の<ruby>固定<rt>こてい</rt></ruby>ダメージは？", answer: "40", choices: ["40", "20", "30", "50"], hint: "レベルに<ruby>関係<rt>かんけい</rt></ruby>なく<ruby>固定<rt>こてい</rt></ruby>" },
+                { question: "<ruby>初代<rt>しょだい</rt></ruby>で<ruby>最<rt>もっと</rt></ruby>も<ruby>防御力<rt>ぼうぎょりょく</rt></ruby>が<ruby>高<rt>たか</rt></ruby>いポケモンは？", answer: "パルシェン", choices: ["パルシェン", "イワーク", "ゴローニャ", "カビゴン"], hint: "180" }
+            ]
+        };
+
+        // 質問データ
+        const questions = [
+            { id: "legendary", text: "伝説（でんせつ）のポケモンですか？", filter: (p, ans) => ans === 'yes' ? p.legendary : ans === 'no' ? !p.legendary : true },
+            { id: "canFly", text: "そらをとぶことができますか？", filter: (p, ans) => ans === 'yes' ? p.canFly : ans === 'no' ? !p.canFly : true },
+            { id: "evolves", text: "進化（しんか）しますか？", filter: (p, ans) => ans === 'yes' ? p.evolves : ans === 'no' ? !p.evolves : true },
+            { id: "wings", text: "つばさがありますか？", filter: (p, ans) => ans === 'yes' ? p.wings : ans === 'no' ? !p.wings : true },
+            { id: "tail", text: "しっぽがありますか？", filter: (p, ans) => ans === 'yes' ? p.tail : ans === 'no' ? !p.tail : true },
+            { id: "limbs4", text: "あしが4本ありますか？", filter: (p, ans) => ans === 'yes' ? p.limbs === 4 : ans === 'no' ? p.limbs !== 4 : true },
+            { id: "limbs0", text: "あしがありませんか？", filter: (p, ans) => ans === 'yes' ? p.limbs === 0 : ans === 'no' ? p.limbs !== 0 : true },
+            { id: "colorRed", text: "からだの色（いろ）はあかですか？", filter: (p, ans) => ans === 'yes' ? p.color === '赤' : ans === 'no' ? p.color !== '赤' : true },
+            { id: "colorBlue", text: "からだの色はあおですか？", filter: (p, ans) => ans === 'yes' ? p.color === '青' : ans === 'no' ? p.color !== '青' : true },
+            { id: "colorYellow", text: "からだの色はきいろですか？", filter: (p, ans) => ans === 'yes' ? p.color === '黄' : ans === 'no' ? p.color !== '黄' : true },
+            { id: "colorGreen", text: "からだの色はみどりですか？", filter: (p, ans) => ans === 'yes' ? p.color === '緑' : ans === 'no' ? p.color !== '緑' : true },
+            { id: "colorPink", text: "からだの色はピンクですか？", filter: (p, ans) => ans === 'yes' ? p.color === 'ピンク' : ans === 'no' ? p.color !== 'ピンク' : true },
+            { id: "colorPurple", text: "からだの色はむらさきですか？", filter: (p, ans) => ans === 'yes' ? p.color === '紫' : ans === 'no' ? p.color !== '紫' : true },
+            { id: "sizeSmall", text: "からだが小さいですか？", filter: (p, ans) => ans === 'yes' ? p.size === '小' : ans === 'no' ? p.size !== '小' : true },
+            { id: "sizeLarge", text: "からだが大きいですか？", filter: (p, ans) => ans === 'yes' ? p.size === '大' : ans === 'no' ? p.size !== '大' : true },
+            { id: "typeWater", text: "みずタイプですか？", filter: (p, ans) => ans === 'yes' ? p.type.includes('みず') : ans === 'no' ? !p.type.includes('みず') : true },
+            { id: "typeFire", text: "ほのおタイプですか？", filter: (p, ans) => ans === 'yes' ? p.type.includes('ほのお') : ans === 'no' ? !p.type.includes('ほのお') : true },
+            { id: "typeGrass", text: "くさタイプですか？", filter: (p, ans) => ans === 'yes' ? p.type.includes('くさ') : ans === 'no' ? !p.type.includes('くさ') : true },
+            { id: "typeElectric", text: "でんきタイプですか？", filter: (p, ans) => ans === 'yes' ? p.type.includes('でんき') : ans === 'no' ? !p.type.includes('でんき') : true },
+            { id: "typePoison", text: "どくタイプですか？", filter: (p, ans) => ans === 'yes' ? p.type.includes('どく') : ans === 'no' ? !p.type.includes('どく') : true },
+            { id: "habitatWater", text: "みずうみ（かわや池）にすんでいますか？", filter: (p, ans) => ans === 'yes' ? p.habitat === '水辺' : ans === 'no' ? p.habitat !== '水辺' : true },
+            { id: "habitatSea", text: "うみにすんでいますか？", filter: (p, ans) => ans === 'yes' ? p.habitat === '海' : ans === 'no' ? p.habitat !== '海' : true },
+            { id: "habitatForest", text: "もりにすんでいますか？", filter: (p, ans) => ans === 'yes' ? p.habitat === '森林' : ans === 'no' ? p.habitat !== '森林' : true },
+            { id: "habitatCity", text: "まちにでてきますか？", filter: (p, ans) => ans === 'yes' ? p.habitat === '都市' : ans === 'no' ? p.habitat !== '都市' : true },
+            { id: "habitatMountain", text: "やまにすんでいますか？", filter: (p, ans) => ans === 'yes' ? p.habitat === '山地' : ans === 'no' ? p.habitat !== '山地' : true },
+            { id: "stageInitial", text: "進化（しんか）するまえのすがたですか？", filter: (p, ans) => ans === 'yes' ? p.stage === '初期' : ans === 'no' ? p.stage !== '初期' : true },
+            { id: "stageFinal", text: "これ以上進化（しんか）しないすがたですか？", filter: (p, ans) => ans === 'yes' ? p.stage === '最終' : ans === 'no' ? p.stage !== '最終' : true },
+            { id: "weightLight", text: "からだがかるいですか？", filter: (p, ans) => ans === 'yes' ? p.weight === '軽' : ans === 'no' ? p.weight !== '軽' : true },
+            { id: "weightHeavy", text: "からだがおもいですか？", filter: (p, ans) => ans === 'yes' ? p.weight === '重' : ans === 'no' ? p.weight !== '重' : true }
+        ];
+
+        // ゲーム状態
+        let currentScreen = 'title';
+        let candidates = [...pokemonData];
+        let askedQuestions = [];
+        let questionCount = 0;
+        let showingCandidates = false;
+
+        // なぞなぞ状態
+        let riddleDifficulty = 'easy';
+        let riddleQuestions = [];
+        let riddleCurrentIndex = 0;
+        let riddleScore = 0;
+
+        // 音楽システム
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let isSoundEnabled = true;
+        let currentBGM = null;
+        let bgmInterval = null;
+
+        // BGM再生
+        function playBGM(type = 'title') {
+            if (!isSoundEnabled) return;
+            stopBGM();
+
+            const melodies = {
+                title: [
+                    { notes: [523, 587, 659, 784, 659, 587, 523], durations: [200, 200, 200, 400, 200, 200, 400] }
+                ],
+                quiz: [
+                    { notes: [659, 698, 784, 659, 698, 784, 880], durations: [150, 150, 150, 150, 150, 150, 300] }
+                ],
+                riddle: [
+                    { notes: [784, 880, 988, 1047, 988, 880, 784], durations: [180, 180, 180, 360, 180, 180, 360] }
+                ],
+                result: [
+                    { notes: [523, 659, 784, 1047], durations: [150, 150, 150, 600] }
+                ]
+            };
+
+            const melody = melodies[type] || melodies.title;
+            let melodyIndex = 0;
+
+            const playMelodyLoop = () => {
+                if (!isSoundEnabled) return;
+                
+                const currentMelody = melody[melodyIndex % melody.length];
+                let time = audioContext.currentTime;
+
+                currentMelody.notes.forEach((freq, i) => {
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+
+                    osc.type = 'square';
+                    osc.frequency.value = freq;
+                    gain.gain.value = 0.05;
+
+                    osc.connect(gain);
+                    gain.connect(audioContext.destination);
+
+                    osc.start(time);
+                    osc.stop(time + currentMelody.durations[i] / 1000);
+                    time += currentMelody.durations[i] / 1000 + 0.05;
+                });
+
+                melodyIndex++;
+            };
+
+            playMelodyLoop();
+            bgmInterval = setInterval(playMelodyLoop, 2500);
+        }
+
+        function stopBGM() {
+            if (bgmInterval) {
+                clearInterval(bgmInterval);
+                bgmInterval = null;
+            }
+        }
+
+        // SE: ボタンクリック音
+        function playClickSound() {
+            if (!isSoundEnabled) return;
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.value = 800;
+            gain.gain.value = 0.1;
+
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            osc.stop(audioContext.currentTime + 0.1);
+        }
+
+        // SE: 正解音
+        function playCorrectSound() {
+            if (!isSoundEnabled) return;
+            const frequencies = [523, 659, 784, 1047];
+            let time = audioContext.currentTime;
+
+            frequencies.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.value = 0.15;
+
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+
+                osc.start(time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+                osc.stop(time + 0.15);
+                time += 0.1;
+            });
+        }
+
+        // SE: 不正解音
+        function playWrongSound() {
+            if (!isSoundEnabled) return;
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            osc.type = 'sawtooth';
+            osc.frequency.value = 200;
+            gain.gain.value = 0.1;
+
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start();
+            osc.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.3);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            osc.stop(audioContext.currentTime + 0.3);
+        }
+
+        // SE: ページめくり音
+        function playPageSound() {
+            if (!isSoundEnabled) return;
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.value = 300;
+            gain.gain.value = 0.08;
+
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.start();
+            osc.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+            osc.stop(audioContext.currentTime + 0.15);
+        }
+
+        // SE: モーダル表示音
+        function playModalSound() {
+            if (!isSoundEnabled) return;
+            const osc1 = audioContext.createOscillator();
+            const osc2 = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            osc1.type = 'sine';
+            osc1.frequency.value = 600;
+            osc2.type = 'sine';
+            osc2.frequency.value = 900;
+            gain.gain.value = 0.08;
+
+            osc1.connect(gain);
+            osc2.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc1.start();
+            osc2.start();
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            osc1.stop(audioContext.currentTime + 0.2);
+            osc2.stop(audioContext.currentTime + 0.2);
+        }
+
+        // 音楽ON/OFF切り替え
+        function toggleSound() {
+            isSoundEnabled = !isSoundEnabled;
+            const icon = document.getElementById('sound-icon');
+            icon.textContent = isSoundEnabled ? '🔊' : '🔇';
+            
+            if (!isSoundEnabled) {
+                stopBGM();
+            } else {
+                // 現在の画面に応じてBGMを再生
+                if (currentScreen === 'title') playBGM('title');
+                else if (currentScreen === 'quiz') playBGM('quiz');
+                else if (currentScreen === 'riddle-play') playBGM('riddle');
+            }
+            
+            playClickSound();
+        }
+
+        // 初回クリックでオーディオを有効化
+        document.addEventListener('click', function initAudio() {
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }, { once: false });
+
+        // ページ読み込み時にタイトルBGM再生
+        window.addEventListener('load', () => {
+            setTimeout(() => playBGM('title'), 500);
+        });
+
+        // 画面切り替え
+        function showScreen(screen) {
+            document.getElementById('title-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('pokedex-screen').classList.add('hidden');
+            document.getElementById('riddle-difficulty-screen').classList.add('hidden');
+            document.getElementById('riddle-play-screen').classList.add('hidden');
+            document.getElementById('riddle-result-screen').classList.add('hidden');
+            document.getElementById(`${screen}-screen`).classList.remove('hidden');
+            currentScreen = screen;
+            
+            playPageSound();
+            
+            // 画面に応じてBGMを切り替え
+            if (screen === 'title') playBGM('title');
+            else if (screen === 'quiz') playBGM('quiz');
+            else if (screen === 'riddle-play') playBGM('riddle');
+            else if (screen === 'result' || screen === 'riddle-result') playBGM('result');
+        }
+
+        function backToTitle() {
+            playClickSound();
+            showScreen('title');
+        }
+
+        // クイズ開始
+        function startQuiz() {
+            playClickSound();
+            candidates = [...pokemonData];
+            askedQuestions = [];
+            questionCount = 0;
+            showingCandidates = false;
+            showScreen('quiz');
+            askNextQuestion();
+        }
+
+        // 次の質問
+        function askNextQuestion() {
+            questionCount++;
+            document.getElementById('question-number').textContent = questionCount;
+            
+            if (candidates.length === 1) {
+                showResult(candidates[0]);
+                return;
+            }
+            
+            if (questionCount > 20) {
+                // ランダムに選択
+                const randomPokemon = candidates[Math.floor(Math.random() * candidates.length)];
+                showResult(randomPokemon);
+                return;
+            }
+            
+            // まだ聞いていない質問から選択
+            const availableQuestions = questions.filter(q => !askedQuestions.includes(q.id));
+            if (availableQuestions.length === 0) {
+                const randomPokemon = candidates[Math.floor(Math.random() * candidates.length)];
+                showResult(randomPokemon);
+                return;
+            }
+            
+            const question = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+            document.getElementById('question-text').textContent = question.text;
+            currentQuestion = question;
+            
+            updateCandidateList();
+        }
+
+        // 回答処理
+        function answer(response) {
+            if (!currentQuestion) return;
+            
+            playClickSound();
+            askedQuestions.push(currentQuestion.id);
+            candidates = candidates.filter(p => currentQuestion.filter(p, response));
+            
+            document.getElementById('candidate-count').textContent = candidates.length;
+            updateCandidateList();
+            
+            askNextQuestion();
+        }
+
+        // 候補リスト更新
+        function updateCandidateList() {
+            const list = document.getElementById('candidate-list');
+            list.innerHTML = '';
+            
+            candidates.forEach(pokemon => {
+                const div = document.createElement('div');
+                div.className = 'text-center p-2 bg-white rounded-lg hover:bg-purple-50 cursor-pointer transition-all';
+                div.onclick = () => showPokemonDetail(pokemon);
+                div.innerHTML = `
+                    <div class="text-3xl mb-1">${pokemon.sprite}</div>
+                    <div class="text-xs font-bold text-purple-600">${pokemon.name}</div>
+                `;
+                list.appendChild(div);
+            });
+            
+            document.getElementById('candidate-count').textContent = candidates.length;
+        }
+
+        // 候補表示切り替え
+        function toggleCandidates() {
+            playClickSound();
+            showingCandidates = !showingCandidates;
+            const list = document.getElementById('candidate-list');
+            const toggle = document.getElementById('toggle-text');
+            
+            if (showingCandidates) {
+                list.classList.remove('hidden');
+                toggle.textContent = '▲ とじる';
+            } else {
+                list.classList.add('hidden');
+                toggle.textContent = '▼ みる';
+            }
+        }
+
+        // 結果表示
+        function showResult(pokemon) {
+            playCorrectSound();
+            document.getElementById('result-sprite').textContent = pokemon.sprite;
+            document.getElementById('result-name').textContent = pokemon.name;
+            document.getElementById('result-type').textContent = `No.${pokemon.no} / ${pokemon.type}タイプ`;
+            showScreen('result');
+        }
+
+        // 図鑑表示
+        function showPokedex() {
+            playClickSound();
+            showScreen('pokedex');
+            renderPokedex();
+        }
+
+        function renderPokedex() {
+            const list = document.getElementById('pokedex-list');
+            list.innerHTML = '';
+            
+            pokemonData.forEach(pokemon => {
+                const card = document.createElement('div');
+                card.className = 'pokemon-card bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 cursor-pointer hover:shadow-xl transition-all';
+                card.onclick = () => showPokemonDetail(pokemon);
+                card.innerHTML = `
+                    <div class="text-5xl text-center mb-2">${pokemon.sprite}</div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500">No.${pokemon.no}</p>
+                        <p class="font-bold text-purple-600">${pokemon.name}</p>
+                        <p class="text-xs text-gray-600">${pokemon.type}</p>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function filterPokedex() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const filtered = pokemonData.filter(p => 
+                p.name.toLowerCase().includes(search) || 
+                p.type.toLowerCase().includes(search) ||
+                p.no.toString().includes(search)
+            );
+            
+            const list = document.getElementById('pokedex-list');
+            list.innerHTML = '';
+            
+            filtered.forEach(pokemon => {
+                const card = document.createElement('div');
+                card.className = 'pokemon-card bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 cursor-pointer hover:shadow-xl transition-all';
+                card.onclick = () => showPokemonDetail(pokemon);
+                card.innerHTML = `
+                    <div class="text-5xl text-center mb-2">${pokemon.sprite}</div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500">No.${pokemon.no}</p>
+                        <p class="font-bold text-purple-600">${pokemon.name}</p>
+                        <p class="text-xs text-gray-600">${pokemon.type}</p>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        // ポケモン詳細モーダル
+        function showPokemonDetail(pokemon) {
+            playModalSound();
+            document.getElementById('modal-name').textContent = pokemon.name;
+            document.getElementById('modal-sprite').textContent = pokemon.sprite;
+            document.getElementById('modal-no').textContent = pokemon.no;
+            document.getElementById('modal-type').textContent = pokemon.type;
+            
+            const hintsContainer = document.getElementById('modal-hints');
+            hintsContainer.innerHTML = `
+                <div class="space-y-2">
+                    <div><span class="hint-badge">タイプ: ${pokemon.type}</span></div>
+                    <div><span class="hint-badge">いろ: ${pokemon.color}</span></div>
+                    <div><span class="hint-badge">おきさ: ${pokemon.size}</span></div>
+                    <div><span class="hint-badge">おもさ: ${pokemon.weight}</span></div>
+                    <div><span class="hint-badge">進化（しんか）: ${pokemon.stage}</span></div>
+                    <div><span class="hint-badge">すんでる場所（ばしょ）: ${pokemon.habitat}</span></div>
+                    <div><span class="hint-badge">あし: ${pokemon.limbs}本</span></div>
+                    ${pokemon.tail ? '<span class="hint-badge">✅ しっぽあり</span>' : '<span class="hint-badge">❌ しっぽなし</span>'}
+                    ${pokemon.wings ? '<span class="hint-badge">✅ つばさあり</span>' : '<span class="hint-badge">❌ つばさなし</span>'}
+                    ${pokemon.canFly ? '<span class="hint-badge">✅ とべる</span>' : '<span class="hint-badge">❌ とべない</span>'}
+                    ${pokemon.legendary ? '<span class="hint-badge">⭐ 伝説（でんせつ）</span>' : ''}
+                    ${pokemon.evolves ? '<span class="hint-badge">🔄 進化（しんか）する</span>' : ''}
+                </div>
+            `;
+            
+            document.getElementById('pokemon-modal').classList.remove('hidden');
+        }
+
+        function closeModal(event) {
+            if (!event || event.target.id === 'pokemon-modal') {
+                playClickSound();
+                document.getElementById('pokemon-modal').classList.add('hidden');
+            }
+        }
+
+        let currentQuestion = null;
+
+        // なぞなぞモード関数
+        function showRiddle() {
+            playClickSound();
+            showScreen('riddle-difficulty');
+        }
+
+        function startRiddle(difficulty) {
+            playClickSound();
+            riddleDifficulty = difficulty;
+            riddleQuestions = [...riddles[difficulty]].sort(() => Math.random() - 0.5);
+            riddleCurrentIndex = 0;
+            riddleScore = 0;
+
+            const totalQuestions = riddleQuestions.length;
+            document.getElementById('riddle-total').textContent = totalQuestions;
+            document.getElementById('riddle-score').textContent = 0;
+
+            showScreen('riddle-play');
+            showRiddleQuestion();
+        }
+
+        function showRiddleQuestion() {
+            if (riddleCurrentIndex >= riddleQuestions.length) {
+                showRiddleResult();
+                return;
+            }
+
+            const riddle = riddleQuestions[riddleCurrentIndex];
+            document.getElementById('riddle-number').textContent = riddleCurrentIndex + 1;
+            document.getElementById('riddle-question').textContent = riddle.question;
+            document.getElementById('riddle-hint').textContent = `💡 ヒント: ${riddle.hint}`;
+
+            const choicesContainer = document.getElementById('riddle-choices');
+            choicesContainer.innerHTML = '';
+
+            const shuffledChoices = [...riddle.choices].sort(() => Math.random() - 0.5);
+
+            shuffledChoices.forEach(choice => {
+                const button = document.createElement('button');
+                button.className = 'bg-purple-500 hover:bg-purple-600 text-white px-6 py-4 rounded-2xl font-bold text-lg transition-all transform hover:scale-105 shadow-lg';
+                button.textContent = choice;
+                button.onclick = () => checkRiddleAnswer(choice, riddle.answer);
+                choicesContainer.appendChild(button);
+            });
+        }
+
+        function checkRiddleAnswer(selected, correct) {
+            const buttons = document.getElementById('riddle-choices').querySelectorAll('button');
+            buttons.forEach(button => {
+                button.disabled = true;
+                if (button.textContent === correct) {
+                    button.className = 'bg-green-500 text-white px-6 py-4 rounded-2xl font-bold text-lg shadow-lg';
+                } else if (button.textContent === selected && selected !== correct) {
+                    button.className = 'bg-red-500 text-white px-6 py-4 rounded-2xl font-bold text-lg shadow-lg';
+                }
+            });
+
+            if (selected === correct) {
+                playCorrectSound();
+                riddleScore++;
+                document.getElementById('riddle-score').textContent = riddleScore;
+            } else {
+                playWrongSound();
+            }
+
+            setTimeout(() => {
+                riddleCurrentIndex++;
+                showRiddleQuestion();
+            }, 1500);
+        }
+
+        function showRiddleResult() {
+            const total = riddleQuestions.length;
+            const percentage = (riddleScore / total) * 100;
+
+            document.getElementById('riddle-final-score').textContent = riddleScore;
+            document.getElementById('riddle-final-total').textContent = total;
+
+            let emoji = '🎉';
+            let comment = 'すごい！';
+
+            if (percentage === 100) {
+                emoji = '👑';
+                comment = 'パーフェクト！ポケモンマスターだ！';
+            } else if (percentage >= 80) {
+                emoji = '🏆';
+                comment = 'すばらしい！ポケモンはかせレベル！';
+            } else if (percentage >= 60) {
+                emoji = '⭐';
+                comment = 'よくできました！';
+            } else if (percentage >= 40) {
+                emoji = '😊';
+                comment = 'まあまあだね！もっとがんばろう！';
+            } else {
+                emoji = '💪';
+                comment = 'もっとポケモンのべんきょうをしよう！';
+            }
+
+            document.getElementById('riddle-final-emoji').textContent = emoji;
+            document.getElementById('riddle-final-comment').textContent = comment;
+
+            showScreen('riddle-result');
+        }
+    </script>
+</body>
+</html>
