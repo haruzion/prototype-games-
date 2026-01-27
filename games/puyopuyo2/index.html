@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ぷよぷよ - 熱血バトラー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-color: #020617;
+            --field-bg: #0f172a;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: #f8fafc;
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        
+        .puyo {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            z-index: 10;
+            box-shadow: inset 0 -4px 6px rgba(0,0,0,0.4);
+            transition: transform 0.1s;
+        }
+        .puyo-red { background: radial-gradient(circle at 35% 35%, #ff4d4d, #990000); border: 1px solid #ff0000; }
+        .puyo-blue { background: radial-gradient(circle at 35% 35%, #4d94ff, #003399); border: 1px solid #0066ff; }
+        .puyo-green { background: radial-gradient(circle at 35% 35%, #4dff88, #009933); border: 1px solid #00ff66; }
+        .puyo-yellow { background: radial-gradient(circle at 35% 35%, #ffff4d, #999900); border: 1px solid #ffff00; }
+        .puyo-ojama { background: #475569; border-radius: 4px; border: 1px solid #94a3b8; }
+
+        .field-container {
+            position: relative;
+            width: 180px;
+            height: 360px;
+            background-color: var(--field-bg);
+            border: 3px solid #334155;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+            overflow: hidden;
+        }
+
+        .ojama-indicator { 
+            height: 34px; 
+            display: flex; 
+            gap: 4px; 
+            margin-bottom: 4px; 
+            background: rgba(15, 23, 42, 0.9);
+            border: 2px solid #1e293b;
+            border-radius: 8px;
+            padding: 0 6px;
+            align-items: center;
+        }
+
+        ruby rt {
+            font-size: 0.6em;
+            color: #94a3b8;
+            letter-spacing: 0.1em;
+        }
+
+        .cutin {
+            position: absolute; width: 100%; top: 35%; left: 0; z-index: 500;
+            pointer-events: none; opacity: 0; display: flex; flex-direction: column; align-items: center;
+        }
+        .cutin-active { animation: cutin-fx 1s ease-in-out forwards; }
+        @keyframes cutin-fx {
+            0% { transform: scale(0.5) rotate(-5deg); opacity: 0; }
+            20% { transform: scale(1.1) rotate(0deg); opacity: 1; }
+            80% { transform: scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: scale(1.2) rotate(5deg); opacity: 0; }
+        }
+
+        .ctrl-btn {
+            background: #1e293b; border: 2px solid #334155; padding: 12px;
+            border-radius: 12px; text-align: center; font-weight: bold; font-size: 14px;
+            user-select: none;
+        }
+
+        .diff-btn {
+            transition: all 0.2s;
+            cursor: pointer;
+            user-select: none;
+        }
+        .diff-btn:hover { transform: translateY(-3px); }
+    </style>
+</head>
+<body>
+
+    <!-- 難易度・キャラクター選択 -->
+    <div id="selection-screen" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[2000] p-4 text-center">
+        <div id="step-difficulty">
+            <h1 class="text-3xl font-black mb-8 text-white">
+                <span class="text-pink-500 text-sm tracking-widest block mb-1">超絶パズルバトル</span>
+                <ruby>難易度<rt>なんいど</rt></ruby>を<ruby>選択<rt>せんたく</rt></ruby>せよ！
+            </h1>
+            <div class="flex flex-col gap-4 w-64 mx-auto">
+                <div class="diff-btn bg-blue-900/50 border-2 border-blue-500 p-4 rounded-xl font-bold text-blue-200" onclick="setDifficulty('easy')">
+                    <ruby>初級<rt>やさしい</rt></ruby>
+                </div>
+                <div class="diff-btn bg-yellow-900/50 border-2 border-yellow-500 p-4 rounded-xl font-bold text-yellow-200" onclick="setDifficulty('normal')">
+                    <ruby>中級<rt>ふつう</rt></ruby>
+                </div>
+                <div class="diff-btn bg-red-900/50 border-2 border-red-500 p-4 rounded-xl font-bold text-red-200" onclick="setDifficulty('hard')">
+                    <ruby>地獄<rt>じごく</rt></ruby>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-character" class="hidden">
+            <h1 class="text-3xl font-black mb-8 text-white">
+                <ruby>勇者<rt>ゆうしゃ</rt></ruby>を<ruby>選べ<rt>えらべ</rt></ruby>！
+            </h1>
+            <div class="flex gap-4 flex-wrap justify-center max-w-lg">
+                <div class="bg-slate-900 border-2 border-slate-800 p-4 rounded-2xl text-center w-32 cursor-pointer hover:border-sky-400" onclick="startGame('アズール')">
+                    <div class="text-4xl mb-2">⚔️</div>
+                    <div class="font-bold text-sm text-sky-400"><ruby>アズール<rt>蒼影の剣士</rt></ruby></div>
+                </div>
+                <div class="bg-slate-900 border-2 border-slate-800 p-4 rounded-2xl text-center w-32 cursor-pointer hover:border-red-500" onclick="startGame('スカーレット')">
+                    <div class="text-4xl mb-2">🥊</div>
+                    <div class="font-bold text-sm text-red-500"><ruby>スカーレット<rt>紅蓮の拳</rt></ruby></div>
+                </div>
+                <div class="bg-slate-900 border-2 border-slate-800 p-4 rounded-2xl text-center w-32 cursor-pointer hover:border-emerald-500" onclick="startGame('ジェイド')">
+                    <div class="text-4xl mb-2">🐲</div>
+                    <div class="font-bold text-sm text-emerald-500"><ruby>ジェイド<rt>翠龍の忍</rt></ruby></div>
+                </div>
+            </div>
+            <button class="mt-8 text-slate-500 underline text-xs" onclick="resetSelection()">難易度を選び直す</button>
+        </div>
+    </div>
+
+    <!-- メインゲーム画面 -->
+    <div id="game-container" class="hidden h-screen flex flex-col">
+        <div class="bg-slate-900 p-2 flex justify-between items-center px-4 border-b border-slate-700">
+            <div class="text-sky-400 font-black"><ruby>自分<rt>じぶん</rt></ruby> <span id="p1-score-val" class="font-mono text-white ml-2">0</span></div>
+            <div class="text-xs bg-slate-800 px-2 py-1 rounded border border-slate-600">
+                <span class="text-slate-400">難易度:</span> <span id="current-diff-display" class="font-bold"></span>
+            </div>
+            <div class="text-red-500 font-black"><span id="p2-score-val" class="font-mono text-white mr-2">0</span> <ruby>相手<rt>あいて</rt></ruby></div>
+        </div>
+
+        <div class="flex justify-center gap-2 py-4 flex-1 overflow-hidden scale-90 sm:scale-100">
+            <!-- P1 -->
+            <div class="relative">
+                <div id="p1-ojama" class="ojama-indicator"></div>
+                <div class="flex gap-1">
+                    <div id="p1-field" class="field-container"></div>
+                    <div class="w-8 flex flex-col gap-1 items-center">
+                        <span class="text-[8px] text-slate-500">次</span>
+                        <div id="p1-next" class="bg-slate-800 p-1 border border-slate-700 rounded h-16 flex flex-col gap-1 items-center">
+                            <div id="p1-next-2" class="w-6 h-6 relative"></div>
+                            <div id="p1-next-1" class="w-6 h-6 relative"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="p1-cutin" class="cutin">
+                    <div id="p1-cutin-txt" class="bg-gradient-to-r from-transparent via-sky-600 to-transparent text-white px-10 py-1 font-black italic"></div>
+                </div>
+            </div>
+
+            <!-- P2 (CPU) -->
+            <div class="relative opacity-90 scale-95 origin-top">
+                <div id="p2-ojama" class="ojama-indicator"></div>
+                <div class="flex gap-1">
+                    <div class="w-8 flex flex-col gap-1 items-center">
+                        <span class="text-[8px] text-slate-500">次</span>
+                        <div id="p2-next" class="bg-slate-800 p-1 border border-slate-700 rounded h-16 flex flex-col gap-1 items-center">
+                            <div id="p2-next-2" class="w-6 h-6 relative"></div>
+                            <div id="p2-next-1" class="w-6 h-6 relative"></div>
+                        </div>
+                    </div>
+                    <div id="p2-field" class="field-container"></div>
+                </div>
+                <div id="p2-cutin" class="cutin">
+                    <div id="p2-cutin-txt" class="bg-gradient-to-r from-transparent via-red-600 to-transparent text-white px-10 py-1 font-black italic"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- コントローラー (モバイル用) -->
+        <div class="p-4 grid grid-cols-3 gap-2 max-w-sm mx-auto w-full md:hidden mb-2">
+            <div class="ctrl-btn" onmousedown="handleInput('rotL')">左回転</div>
+            <div class="ctrl-btn" onmousedown="handleInput('up')">高速落</div>
+            <div class="ctrl-btn" onmousedown="handleInput('rotR')">右回転</div>
+            <div class="ctrl-btn" onmousedown="handleInput('left')">←</div>
+            <div class="ctrl-btn" onmousedown="handleInput('down')">↓</div>
+            <div class="ctrl-btn" onmousedown="handleInput('right')">→</div>
+        </div>
+    </div>
+
+    <div id="pause-modal" class="fixed inset-0 bg-black/70 hidden z-[3000] flex-col items-center justify-center backdrop-blur-sm">
+        <h2 class="text-4xl font-black text-white mb-6 italic">一時停止中</h2>
+        <button onclick="togglePause()" class="bg-sky-500 px-12 py-3 rounded-full font-bold text-white">再開する</button>
+    </div>
+
+    <div id="result-modal" class="fixed inset-0 bg-black/80 hidden z-[3000] flex-col items-center justify-center">
+        <h2 id="result-text" class="text-5xl font-black text-white mb-8 italic italic">勝敗</h2>
+        <button onclick="location.reload()" class="bg-white px-12 py-3 rounded-full font-bold text-black">タイトルへ</button>
+    </div>
+
+<script>
+    // --- 音声エンジン ---
+    const AudioEngine = {
+        ctx: null, isBgmPlaying: false,
+        init() { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+        startBGM() {
+            if (this.isBgmPlaying) return; this.isBgmPlaying = true;
+            const tempo = 155; const stepTime = 60 / tempo / 2; let step = 0;
+            const chords = [[261.63, 329.63, 392.00], [196.00, 246.94, 293.66], [220.00, 261.63, 329.63], [174.61, 220.00, 261.63]];
+            const nextNote = () => {
+                if (!this.isBgmPlaying) return;
+                const cIdx = Math.floor(step / 16) % chords.length;
+                const freq = chords[cIdx][step % 3];
+                this.playTone(freq / 2, 'square', 0.1, 0.03);
+                if (step % 4 === 0) this.playTone(freq * 2, 'triangle', 0.05, 0.02);
+                if (step % 8 === 0) this.playNoise(0.04, 0.02);
+                step++; setTimeout(nextNote, stepTime * 1000);
+            };
+            nextNote();
+        },
+        playTone(f, t, d, v) {
+            const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+            o.type = t; o.frequency.setValueAtTime(f, this.ctx.currentTime);
+            g.gain.setValueAtTime(v, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + d);
+            o.connect(g); g.connect(this.ctx.destination);
+            o.start(); o.stop(this.ctx.currentTime + d);
+        },
+        playNoise(d, v) {
+            const bs = this.ctx.sampleRate * d; const b = this.ctx.createBuffer(1, bs, this.ctx.sampleRate);
+            const data = b.getChannelData(0); for (let i = 0; i < bs; i++) data[i] = Math.random() * 2 - 1;
+            const n = this.ctx.createBufferSource(); n.buffer = b;
+            const g = this.ctx.createGain(); g.gain.setValueAtTime(v, this.ctx.currentTime);
+            g.gain.linearRampToValueAtTime(0, this.ctx.currentTime + d);
+            n.connect(g); g.connect(this.ctx.destination); n.start();
+        },
+        playChain(s) {
+            const sc = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+            this.playTone(sc[Math.min(s-1, 7)] * (s > 8 ? 2 : 1), 'sine', 0.4, 0.1);
+        }
+    };
+
+    // --- ゲーム設定 ---
+    const ROWS = 12, COLS = 6, SIZE = 30;
+    const COLORS = ['red', 'blue', 'green', 'yellow'];
+    const DIFF_CONFIG = {
+        easy: { label: '初級', color: 'text-blue-400', cpuSpeed: 1200, cpuInterval: 250, power: 0.8 },
+        normal: { label: '中級', color: 'text-yellow-400', cpuSpeed: 800, cpuInterval: 140, power: 1.0 },
+        hard: { label: '地獄', color: 'text-red-500', cpuSpeed: 400, cpuInterval: 70, power: 1.4 }
+    };
+    const CHARS = {
+        'アズール': { power: 1.1, speed: 1000, spells: ['ソニック斬', '氷結の太刀', 'プラズマ閃', '極限解放'] },
+        'スカーレット': { power: 1.3, speed: 1200, spells: ['剛烈拳', '爆裂破', '紅蓮旋風', '最終奥義'] },
+        'ジェイド': { power: 0.9, speed: 700, spells: ['疾風', '影潜', '龍昇', '神威'] },
+        'ヴォイド': { power: 1.1, speed: 850, spells: ['奈落', '重力', '暗黒', '虚無'] }
+    };
+
+    let currentDifficulty = 'normal';
+    let isPaused = false;
+    let p1, p2, lastT = 0;
+
+    function setDifficulty(d) {
+        currentDifficulty = d;
+        document.getElementById('step-difficulty').classList.add('hidden');
+        document.getElementById('step-character').classList.remove('hidden');
+    }
+
+    function resetSelection() {
+        document.getElementById('step-difficulty').classList.remove('hidden');
+        document.getElementById('step-character').classList.add('hidden');
+    }
+
+    class Game {
+        constructor(id, charName, isCPU = false) {
+            this.id = id;
+            this.charName = charName;
+            this.char = { ...CHARS[charName] };
+            this.isCPU = isCPU;
+            
+            if(isCPU) {
+                this.char.speed = DIFF_CONFIG[currentDifficulty].cpuSpeed;
+                this.char.power *= DIFF_CONFIG[currentDifficulty].power;
+            }
+
+            this.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+            this.score = 0; this.pendingOjama = 0; this.isProcessing = false; this.gameOver = false;
+            this.currentPair = null; this.nextPair = this.genPair();
+            this.dropTimer = 0; this.combo = 0; this.lockTimer = 0; this.lockActions = 0;
+
+            this.fieldEl = document.getElementById(`${id}-field`);
+            this.scoreEl = document.getElementById(`${id}-score-val`);
+            this.ojamaEl = document.getElementById(`${id}-ojama`);
+            this.nextEls = [document.getElementById(`${id}-next-1`), document.getElementById(`${id}-next-2`)];
+            this.cutinEl = document.getElementById(`${id}-cutin`);
+            this.cutinTxtEl = document.getElementById(`${id}-cutin-txt`);
+        }
+
+        genPair() { return [COLORS[Math.floor(Math.random()*4)], COLORS[Math.floor(Math.random()*4)]]; }
+
+        spawn() {
+            if (this.grid[0][2]) return this.end(false);
+            const [c1, c2] = this.nextPair;
+            this.currentPair = {
+                c: { x: 2, y: 0, color: c1, el: this.createEl(2, 0, c1) },
+                s: { x: 2, y: -1, color: c2, el: this.createEl(2, -1, c2) },
+                rot: 0
+            };
+            this.nextPair = this.genPair(); this.updateNextUI();
+            this.lockTimer = 0; this.lockActions = 0;
+            if (this.isCPU) this.cpuStep();
+        }
+
+        updateNextUI() {
+            this.nextEls.forEach((el, i) => {
+                el.innerHTML = '';
+                const p = document.createElement('div');
+                p.className = `puyo puyo-${this.nextPair[i]}`;
+                p.style.left = '0'; p.style.top = '0';
+                el.appendChild(p);
+            });
+        }
+
+        createEl(x, y, color) {
+            const div = document.createElement('div');
+            div.className = `puyo puyo-${color}`;
+            div.style.left = `${x * SIZE}px`; div.style.top = `${y * SIZE}px`;
+            this.fieldEl.appendChild(div);
+            return div;
+        }
+
+        updateEl(p) {
+            p.el.style.left = `${p.x * SIZE}px`; p.el.style.top = `${p.y * SIZE}px`;
+            p.el.style.visibility = p.y < 0 ? 'hidden' : 'visible';
+        }
+
+        move(dx, dy) {
+            if (isPaused || this.isProcessing || this.gameOver || !this.currentPair) return false;
+            const p = this.currentPair;
+            if (this.canFit(p.c.x + dx, p.c.y + dy) && this.canFit(p.s.x + dx, p.s.y + dy)) {
+                p.c.x += dx; p.c.y += dy; p.s.x += dx; p.s.y += dy;
+                this.updateEl(p.c); this.updateEl(p.s);
+                if (dy === 0) this.resetLock(); return true;
+            }
+            return false;
+        }
+
+        rotate(dir) {
+            if (isPaused || this.isProcessing || this.gameOver || !this.currentPair) return;
+            const p = this.currentPair; const nr = (p.rot + dir + 4) % 4;
+            let nx = p.c.x, ny = p.c.y;
+            if (nr === 0) ny--; else if (nr === 1) nx++; else if (nr === 2) ny++; else nx--;
+            if (this.canFit(nx, ny)) {
+                p.s.x = nx; p.s.y = ny; p.rot = nr; this.updateEl(p.s); this.resetLock();
+                if(!this.isCPU) AudioEngine.playTone(400, 'sine', 0.05, 0.02);
+            }
+        }
+
+        resetLock() { if (this.lockActions < 15) { this.lockTimer = 0; this.lockActions++; } }
+
+        canFit(x, y) { return x >= 0 && x < COLS && y < ROWS && (y < 0 || !this.grid[y][x]); }
+
+        async lock() {
+            if (this.isProcessing || !this.currentPair) return;
+            this.isProcessing = true;
+            [this.currentPair.c, this.currentPair.s].forEach(part => {
+                if (part.y >= 0) this.grid[part.y][part.x] = part; else part.el.remove();
+            });
+            this.currentPair = null; this.combo = 0;
+            await this.resolve();
+            if (this.pendingOjama > 0) await this.dropOjama();
+            this.isProcessing = false;
+            if (!this.gameOver) this.spawn();
+        }
+
+        async resolve() {
+            let found = true;
+            while(found) {
+                await this.applyGravity();
+                const matched = await this.findMatches();
+                if (matched.length > 0) {
+                    this.combo++; AudioEngine.playChain(this.combo);
+                    if (this.combo >= 2) this.triggerCutin();
+                    const dmg = Math.floor((matched.length * 10 * (this.combo * 15) * this.char.power) / 70);
+                    this.score += matched.length * 10 * this.combo;
+                    this.scoreEl.innerText = this.score;
+                    if (dmg > 0) this.sendOjama(dmg);
+                    await new Promise(r => setTimeout(r, 400));
+                } else { found = false; }
+            }
+        }
+
+        triggerCutin() {
+            const spell = this.char.spells[Math.min(this.combo - 2, this.char.spells.length - 1)];
+            this.cutinTxtEl.innerText = spell;
+            this.cutinEl.classList.remove('cutin-active');
+            void this.cutinEl.offsetWidth; this.cutinEl.classList.add('cutin-active');
+        }
+
+        async applyGravity() {
+            let moved = true;
+            while(moved) {
+                moved = false;
+                for (let x = 0; x < COLS; x++) {
+                    for (let y = ROWS - 2; y >= 0; y--) {
+                        if (this.grid[y][x] && !this.grid[y+1][x]) {
+                            this.grid[y+1][x] = this.grid[y][x]; this.grid[y][x] = null;
+                            this.grid[y+1][x].y = y + 1; this.updateEl(this.grid[y+1][x]);
+                            moved = true;
+                        }
+                    }
+                }
+                if (moved) await new Promise(r => setTimeout(r, 50));
+            }
+        }
+
+        async findMatches() {
+            const checked = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+            let toPop = [];
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    if (this.grid[y][x] && !checked[y][x] && this.grid[y][x].color !== 'ojama') {
+                        const group = this.flood(x, y, this.grid[y][x].color);
+                        group.forEach(p => checked[p.y][p.x] = true);
+                        if (group.length >= 4) {
+                            toPop.push(...group);
+                            group.forEach(p => {
+                                [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
+                                    const nx = p.x+dx, ny = p.y+dy;
+                                    if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && this.grid[ny][nx]?.color === 'ojama') toPop.push({x:nx, y:ny});
+                                });
+                            });
+                        }
+                    }
+                }
+            }
+            const unique = []; const set = new Set();
+            toPop.forEach(p => { const k = `${p.x},${p.y}`; if(!set.has(k)) { set.add(k); unique.push(p); }});
+            unique.forEach(p => {
+                const item = this.grid[p.y][p.x];
+                if (item) {
+                    item.el.style.transform = 'scale(0.2)';
+                    setTimeout(() => item.el.remove(), 200);
+                    this.grid[p.y][p.x] = null;
+                }
+            });
+            return unique;
+        }
+
+        flood(x, y, color) {
+            const q = [{x,y}], res = [], seen = new Set();
+            while(q.length) {
+                const c = q.shift(); const k = `${c.x},${c.y}`;
+                if(seen.has(k) || c.x<0 || c.x>=COLS || c.y<0 || c.y>=ROWS) continue;
+                seen.add(k); if(this.grid[c.y][c.x]?.color !== color) continue;
+                res.push(c); q.push({x:c.x+1, y:c.y}, {x:c.x-1, y:c.y}, {x:c.x, y:c.y+1}, {x:c.x, y:c.y-1});
+            }
+            return res;
+        }
+
+        sendOjama(count) {
+            if(!this.opponent) return;
+            if(this.pendingOjama > 0) {
+                const off = Math.min(this.pendingOjama, count); this.pendingOjama -= off; count -= off;
+            }
+            if(count > 0) this.opponent.pendingOjama += count;
+            this.updateOjamaUI(); this.opponent.updateOjamaUI();
+        }
+
+        updateOjamaUI() {
+            this.ojamaEl.innerHTML = '';
+            let val = this.pendingOjama; if(val <= 0) return;
+            const OJAMA_DEF = [{ val: 20, icon: '🔴' }, { val: 10, icon: '🔶' }, { val: 5, icon: '🔷' }, { val: 1, icon: '⚪' }];
+            OJAMA_DEF.forEach(d => {
+                const count = Math.floor(val / d.val);
+                if (count > 0) {
+                    const unit = document.createElement('div');
+                    unit.className = 'flex items-center gap-[1px]';
+                    unit.innerHTML = `<span class="text-xs">${d.icon}</span><span class="text-[9px] font-bold text-slate-400">x${count}</span>`;
+                    this.ojamaEl.appendChild(unit); val %= d.val;
+                }
+            });
+        }
+
+        async dropOjama() {
+            const count = Math.min(this.pendingOjama, 30);
+            this.pendingOjama -= count; this.updateOjamaUI();
+            for(let i=0; i<count; i++) {
+                const x = i % COLS;
+                if(!this.grid[0][x]) this.grid[0][x] = { x, y:0, color:'ojama', el: this.createEl(x, 0, 'ojama') };
+            }
+            await this.applyGravity();
+        }
+
+        cpuStep() {
+            if(this.gameOver) return;
+            const targetX = Math.floor(Math.random()*COLS);
+            const targetR = Math.floor(Math.random()*4);
+            const intv = setInterval(() => {
+                if(isPaused || this.gameOver || this.isProcessing || !this.currentPair) { if(this.gameOver) clearInterval(intv); return; }
+                if(this.currentPair.rot !== targetR) this.rotate(1);
+                else if(this.currentPair.c.x < targetX) this.move(1, 0);
+                else if(this.currentPair.c.x > targetX) this.move(-1, 0);
+                else if(!this.move(0, 1)) { this.lock(); clearInterval(intv); }
+            }, DIFF_CONFIG[currentDifficulty].cpuInterval);
+        }
+
+        tick(dt) {
+            if(isPaused || this.gameOver || this.isProcessing || !this.currentPair) return;
+            this.dropTimer += dt;
+            const grounded = !this.canFit(this.currentPair.c.x, this.currentPair.c.y + 1) || !this.canFit(this.currentPair.s.x, this.currentPair.s.y + 1);
+            if(!grounded) {
+                if(this.dropTimer > this.char.speed) { this.move(0, 1); this.dropTimer = 0; }
+            } else {
+                this.lockTimer += dt;
+                if(this.lockTimer > 500) this.lock();
+            }
+        }
+
+        end(win) {
+            if(this.gameOver) return;
+            this.gameOver = true; this.opponent.gameOver = true;
+            document.getElementById('result-modal').style.display = 'flex';
+            document.getElementById('result-text').innerText = this.isCPU ? (win ? "完敗..." : "完全勝利！") : (win ? "完全勝利！" : "完敗...");
+        }
+    }
+
+    function startGame(char) {
+        AudioEngine.init(); AudioEngine.startBGM();
+        document.getElementById('selection-screen').classList.add('hidden');
+        document.getElementById('game-container').classList.remove('hidden');
+        
+        const diffDisplay = document.getElementById('current-diff-display');
+        diffDisplay.innerText = DIFF_CONFIG[currentDifficulty].label;
+        diffDisplay.className = `font-bold ${DIFF_CONFIG[currentDifficulty].color}`;
+
+        p1 = new Game('p1', char, false);
+        p2 = new Game('p2', 'ヴォイド', true);
+        p1.opponent = p2; p2.opponent = p1;
+        p1.spawn(); p2.spawn();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function togglePause() {
+        isPaused = !isPaused;
+        document.getElementById('pause-modal').style.display = isPaused ? 'flex' : 'none';
+    }
+
+    function handleInput(type) {
+        if(!p1 || p1.isProcessing || p1.gameOver || isPaused) return;
+        if(type === 'left') p1.move(-1, 0);
+        if(type === 'right') p1.move(1, 0);
+        if(type === 'down') { if(!p1.move(0, 1)) p1.lock(); }
+        if(type === 'up') while(p1.move(0,1));
+        if(type === 'rotR') p1.rotate(1);
+        if(type === 'rotL') p1.rotate(-1);
+    }
+
+    // ブラウザのショートカット競合を完全に防ぐためのイベントリスナー
+    window.addEventListener('keydown', e => {
+        // 対象となるキーの一覧
+        const targetKeys = ['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'x', 'X', 'z', 'Z', ' ', 'Escape', 'p', 'P'];
+        
+        if (targetKeys.includes(e.key)) {
+            // ブラウザのデフォルト動作を抑制
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // ポーズ処理
+        if(e.key === 'p' || e.key === 'Escape' || e.key === 'P') {
+            togglePause();
+            return;
+        }
+
+        // ゲーム操作処理
+        const map = {
+            ArrowLeft: 'left',
+            ArrowRight: 'right',
+            ArrowDown: 'down',
+            ArrowUp: 'rotR',
+            x: 'rotR',
+            X: 'rotR',
+            z: 'rotL',
+            Z: 'rotL',
+            ' ': 'up'
+        };
+
+        if(map[e.key]) {
+            handleInput(map[e.key]);
+        }
+    }, { passive: false });
+
+    function gameLoop(t) {
+        const dt = t - lastT;
+        if(!isPaused && p1) { p1.tick(dt); p2.tick(dt); }
+        lastT = t; requestAnimationFrame(gameLoop);
+    }
+</script>
+</body>
+</html>

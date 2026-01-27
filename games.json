@@ -26,6 +26,60 @@
       "image": "",
       "url": "games/pokemon-find-name/index.html",
       "tags": ["パズル", "シングルプレイ", "ポケモン"]
+    },
+    {
+      "id": "strongest-king",
+      "title": "最強王図鑑バトル",
+      "description": "カードバトルゲーム！色々な生き物や物のカードで対戦しよう。相手のライフを0にすれば勝利！戦略を考えて最強を目指せ！",
+      "icon": "👑",
+      "image": "",
+      "url": "games/strongest-king/index.html",
+      "tags": ["カードバトル", "シングルプレイ", "戦略"]
+    },
+    {
+      "id": "strongest-king2",
+      "title": "最強王図鑑バトル 拡張版",
+      "description": "最強王図鑑バトルの拡張版！新しいカードや機能を追加した進化版カードバトルゲーム。より深い戦略が楽しめる！",
+      "icon": "🏆",
+      "image": "",
+      "url": "games/strongest-king2/index.html",
+      "tags": ["カードバトル", "シングルプレイ", "戦略"]
+    },
+    {
+      "id": "strongest-king3",
+      "title": "最強王図鑑バトル STORY",
+      "description": "ストーリーモード搭載の最強王図鑑バトル！物語を進めながらカードバトルを楽しもう。強敵たちを倒して最強の称号を手に入れろ！",
+      "icon": "📖",
+      "image": "",
+      "url": "games/strongest-king3/index.html",
+      "tags": ["カードバトル", "シングルプレイ", "ストーリー"]
+    },
+    {
+      "id": "pokemon-akinator",
+      "title": "ポケモンアーキネーター",
+      "description": "ポケモンを当てる推理ゲーム！質問に答えていくと、あなたが思い浮かべたポケモンを当ててくれる。何匹当てられるかな？",
+      "icon": "🔮",
+      "image": "",
+      "url": "games/pokemon-akinator/index.html",
+      "tags": ["推理", "シングルプレイ", "ポケモン"]
+    },
+    {
+      "id": "rock-paper-scissors",
+      "title": "じゃんけんアニマルバトル",
+      "description": "動物たちとじゃんけんバトル！グー・チョキ・パーで勝負して、アーケード風の演出を楽しもう。連勝を目指せ！",
+      "icon": "✊",
+      "image": "",
+      "url": "games/rock-paper-scissors/index.html",
+      "tags": ["じゃんけん", "シングルプレイ", "アクション"]
+    },
+    {
+      "id": "puyopuyo2",
+      "title": "ぷよぷよ",
+      "description": "落ち物パズルゲーム！同じ色のぷよを4個以上繋げて消そう。連鎖を決めて相手におじゃまぷよを送り込め！",
+      "icon": "🎨",
+      "image": "",
+      "url": "games/puyopuyo2/index.html",
+      "tags": ["パズル", "対戦", "アクション"]
     }
   ]
 }

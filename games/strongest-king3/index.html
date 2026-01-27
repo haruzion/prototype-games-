@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>最強王図鑑バトル STORY - ストーリーモード</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+        
+        body {
+            font-family: 'DotGothic16', sans-serif;
+            background-color: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .battle-container {
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            background: #1e293b;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        .screen {
+            position: absolute;
+            inset: 0;
+            background-color: #0f172a;
+            z-index: 100;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .hidden-screen { display: none !important; }
+
+        .character-card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .character-card:hover {
+            border-color: rgba(99, 102, 241, 0.5);
+            transform: translateY(-2px);
+        }
+        .character-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .character-card.locked:hover {
+            transform: none;
+        }
+
+        .skill-slot {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .skill-slot:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(99, 102, 241, 0.5);
+        }
+        .skill-slot.selected {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.8);
+        }
+        .skill-slot.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .story-dialog {
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            color: white;
+        }
+
+        .mode-btn {
+            width: 100%;
+            padding: 20px;
+            margin-bottom: 12px;
+            border-radius: 16px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: white;
+            transition: all 0.2s;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        .mode-btn:active { transform: scale(0.98); }
+
+        .badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        /* Battle Screen Styles */
+        .field-bg {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .enemy-field {
+            flex: 1.2;
+            background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
+        }
+        
+        .player-field {
+            flex: 0.8;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .status-window {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 12px;
+            padding: 10px;
+            width: 220px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 40;
+        }
+
+        .hp-bar-bg {
+            width: 100%;
+            height: 10px;
+            background-color: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #4ade80);
+            transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .hp-bar-fill.warning { background: linear-gradient(90deg, #eab308, #fde047); }
+        .hp-bar-fill.danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        .monster {
+            position: absolute;
+            font-size: 90px;
+            transition: all 0.3s;
+            z-index: 5;
+            filter: drop-shadow(0 15px 15px rgba(0,0,0,0.6));
+        }
+        .enemy-pos { top: 20%; right: 15%; }
+        .player-pos { bottom: 15%; left: 15%; }
+
+        .log-box {
+            height: 100px;
+            background-color: rgba(15, 23, 42, 0.9);
+            color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px;
+            overflow-y: auto;
+            font-size: 14px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            line-height: 1.6;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .action-button {
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.2s;
+            min-height: 85px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 10px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            color: white;
+            text-align: left;
+        }
+        .action-button:active:not(:disabled) {
+            transform: scale(0.95);
+            background: rgba(255,255,255,0.1);
+        }
+        .action-button:disabled {
+            background-color: rgba(255,255,255,0.02) !important;
+            color: #475569 !important;
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .special-move-btn {
+            background: linear-gradient(135deg, rgba(254,240,138,0.1), rgba(254,240,138,0.2));
+            border: 1px solid rgba(234,179,8,0.5);
+        }
+
+        .shake { animation: shake 0.4s ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+<div class="battle-container">
+    <!-- 1. Title Screen -->
+    <div id="title-screen" class="screen">
+        <div class="absolute top-4 right-4 z-50">
+            <button id="music-toggle-btn" onclick="toggleMusic()" class="text-3xl bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600 rounded-full w-12 h-12 flex items-center justify-center transition-all">
+                🔊
+            </button>
+        </div>
+        <h1 class="text-5xl font-black text-white text-center mt-20 mb-4 tracking-wider">最強王 STORY</h1>
+        <p class="text-center text-slate-400 mb-12 text-sm">～伝説の戦士たち～</p>
+        <div class="flex flex-col gap-3 w-full max-w-sm mx-auto">
+            <button onclick="selectMode('story')" class="mode-btn bg-gradient-to-r from-purple-600 to-indigo-600 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <span>📖 ストーリーモード</span>
+                    <span class="text-xs opacity-80">NEW!</span>
+                </div>
+            </button>
+            <button onclick="selectMode('free')" class="mode-btn bg-gradient-to-r from-sky-600 to-blue-600 shadow-lg">
+                <span>⚔️ フリーバトル</span>
+            </button>
+            <button onclick="selectMode('tournament')" class="mode-btn bg-gradient-to-r from-rose-600 to-pink-600 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <span>🏆 トーナメント</span>
+                    <span class="text-xs opacity-80">HOT!</span>
+                </div>
+            </button>
+            <button onclick="selectMode('custom')" class="mode-btn bg-gradient-to-r from-emerald-600 to-teal-600 shadow-lg">
+                <span>🎯 カスタムバトル</span>
+            </button>
+        </div>
+        <div class="text-center mt-8">
+            <div class="mb-4">
+                <p class="text-slate-400 text-xs mb-2">難易度</p>
+                <div class="flex justify-center gap-2">
+                    <button onclick="setDifficulty('easy')" id="diff-easy" class="px-4 py-1 text-sm rounded-full bg-slate-700 text-slate-300 border border-slate-600 hover:border-emerald-500 transition-all">
+                        😊 かんたん
+                    </button>
+                    <button onclick="setDifficulty('normal')" id="diff-normal" class="px-4 py-1 text-sm rounded-full bg-indigo-600 text-white border-2 border-indigo-400">
+                        ⚔️ ふつう
+                    </button>
+                    <button onclick="setDifficulty('hard')" id="diff-hard" class="px-4 py-1 text-sm rounded-full bg-slate-700 text-slate-300 border border-slate-600 hover:border-rose-500 transition-all">
+                        🔥 むずかしい
+                    </button>
+                </div>
+            </div>
+            <p class="text-slate-500 text-xs">進行度: <span id="progress-text">0</span>%</p>
+            <div class="progress-bar max-w-sm mx-auto">
+                <div id="progress-bar-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Story Chapter Selection -->
+    <div id="story-screen" class="screen hidden-screen">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-white">ストーリー選択</h2>
+            <button onclick="backToTitle()" class="text-sm text-slate-400 border border-slate-700 px-3 py-1 rounded-full">戻る</button>
+        </div>
+        <div id="chapter-list" class="space-y-3"></div>
+    </div>
+
+    <!-- 3. Character Selection -->
+    <div id="selection-screen" class="screen hidden-screen">
+        <div class="flex justify-between items-center mb-6 sticky top-0 bg-slate-900/95 backdrop-blur-md py-2 z-10 rounded-b-xl px-2">
+            <h2 class="text-xl font-bold text-white">キャラクター選択</h2>
+            <button onclick="backToMode()" class="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-full">戻る</button>
+        </div>
+        <div id="character-grid" class="space-y-3 pb-12"></div>
+    </div>
+
+    <!-- 4. Skill Customize Screen -->
+    <div id="skill-screen" class="screen hidden-screen">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-white">技カスタマイズ</h2>
+            <button onclick="backToSelection()" class="text-xs text-slate-400 border border-slate-700 px-3 py-1 rounded-full">戻る</button>
+        </div>
+        <div class="bg-slate-800/50 rounded-xl p-4 mb-4">
+            <div class="flex items-center gap-3 mb-2">
+                <span id="selected-char-sprite" class="text-5xl"></span>
+                <div>
+                    <p id="selected-char-name" class="text-white font-bold text-lg"></p>
+                    <p id="selected-char-type" class="text-slate-400 text-sm"></p>
+                </div>
+            </div>
+        </div>
+        <p class="text-slate-300 text-sm mb-3">使用する技を4つ選択してください（<span id="selected-count">0</span>/4）</p>
+        <div id="skill-list" class="space-y-2 mb-4"></div>
+        <button id="confirm-skills-btn" onclick="confirmSkills()" disabled class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">
+            バトル開始
+        </button>
+    </div>
+
+    <!-- 5. Story Dialog Screen -->
+    <div id="dialog-screen" class="screen hidden-screen">
+        <div class="story-dialog">
+            <div class="flex items-start gap-3 mb-3">
+                <span id="dialog-sprite" class="text-4xl"></span>
+                <div class="flex-grow">
+                    <p id="dialog-name" class="text-indigo-400 font-bold mb-1"></p>
+                    <p id="dialog-text" class="text-white leading-relaxed"></p>
+                </div>
+            </div>
+        </div>
+        <button onclick="nextDialog()" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl">
+            次へ →
+        </button>
+    </div>
+
+    <!-- 5.5 Story Continue Screen -->
+    <div id="story-continue-screen" class="screen hidden-screen">
+        <div class="story-dialog">
+            <div class="text-center mb-6">
+                <div class="text-4xl mb-3">🎉</div>
+                <p class="text-2xl font-bold text-emerald-400 mb-2">章クリア！</p>
+                <p class="text-lg text-white" id="continue-message">次の章に進みますか？</p>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="continueStory()" class="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl">
+                はい
+            </button>
+            <button onclick="backToTitle()" class="flex-1 py-3 bg-slate-700 text-white font-bold rounded-xl">
+                いいえ
+            </button>
+        </div>
+    </div>
+
+    <!-- 5.6 Tournament Progress Screen -->
+    <div id="tournament-screen" class="screen hidden-screen">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-white">🏆 トーナメント</h2>
+            <button onclick="backToTitle()" class="text-sm text-slate-400 border border-slate-700 px-3 py-1 rounded-full">戻る</button>
+        </div>
+        <div class="bg-slate-800/50 rounded-xl p-4 mb-6">
+            <div class="flex items-center gap-3 mb-3">
+                <span id="tournament-char-sprite" class="text-5xl"></span>
+                <div class="flex-grow">
+                    <p id="tournament-char-name" class="text-white font-bold text-lg"></p>
+                    <p class="text-slate-400 text-sm">現在の戦績: <span id="tournament-wins" class="text-emerald-400 font-bold">0</span>勝</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-slate-900/50 rounded-lg p-2">
+                    <p class="text-slate-500">HP</p>
+                    <p class="text-white font-bold" id="tournament-hp-display">100%</p>
+                </div>
+                <div class="bg-slate-900/50 rounded-lg p-2">
+                    <p class="text-slate-500">PP回復まで</p>
+                    <p class="text-white font-bold" id="tournament-pp-display">3戦</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-rose-900/20 border border-rose-800/50 rounded-xl p-4 mb-4">
+            <p class="text-rose-300 text-sm font-bold mb-2">次の対戦相手</p>
+            <div class="flex items-center gap-3">
+                <span id="next-opponent-sprite" class="text-4xl"></span>
+                <div>
+                    <p id="next-opponent-name" class="text-white font-bold"></p>
+                    <p id="next-opponent-type" class="text-slate-400 text-sm"></p>
+                </div>
+            </div>
+        </div>
+        <button onclick="startTournamentBattle()" class="w-full py-4 bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold text-lg rounded-xl shadow-lg">
+            バトル開始！
+        </button>
+        <div class="mt-4 text-center">
+            <p class="text-slate-500 text-xs">※ HPは毎戦全回復、PPは3戦ごとに全回復</p>
+        </div>
+    </div>
+
+    <!-- 6. Battle Screen -->
+    <div id="battle-screen" class="flex-grow relative overflow-hidden hidden-screen">
+        <div class="absolute top-4 left-4 z-50">
+            <div class="bg-white/10 backdrop-blur-md border border-white/20 text-white px-4 py-1.5 font-bold text-xs rounded-full">
+                <span id="battle-info">バトル中</span>
+            </div>
+        </div>
+        <div class="absolute top-4 right-4 z-50">
+            <button onclick="confirmReturnToMenu()" class="bg-slate-800/70 hover:bg-slate-700/70 border border-slate-600 text-white px-3 py-1.5 font-bold text-xs rounded-full transition-all">
+                ← メニュー
+            </button>
+        </div>
+        
+        <div class="field-bg">
+            <div class="enemy-field"></div>
+            <div class="player-field"></div>
+        </div>
+
+        <!-- Enemy Status -->
+        <div class="absolute top-16 left-6 status-window">
+            <div class="flex justify-between items-center mb-2">
+                <span id="enemy-name-display" class="font-bold text-slate-900 text-sm"></span>
+                <span id="enemy-type-display" class="text-[9px] bg-slate-800 text-white px-2 py-0.5 rounded font-bold"></span>
+            </div>
+            <div class="hp-bar-bg"><div id="enemy-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
+            <div class="flex justify-between mt-1.5 text-[10px] font-bold text-slate-600">
+                <span id="enemy-item-display"></span>
+                <span id="enemy-hp-text"></span>
+            </div>
+        </div>
+        
+        <!-- Player Status -->
+        <div class="absolute bottom-12 right-6 status-window">
+            <div class="flex justify-between items-center mb-2">
+                <span id="player-name-display" class="font-bold text-slate-900 text-sm"></span>
+                <span id="player-type-display" class="text-[9px] bg-slate-800 text-white px-2 py-0.5 rounded font-bold"></span>
+            </div>
+            <div class="hp-bar-bg"><div id="player-hp-bar" class="hp-bar-fill" style="width: 100%;"></div></div>
+            <div class="flex justify-between mt-1.5 text-[10px] font-bold text-slate-600">
+                <span id="player-item-display"></span>
+                <span id="player-hp-text"></span>
+            </div>
+        </div>
+
+        <div id="enemy-sprite" class="monster enemy-pos"></div>
+        <div id="player-sprite" class="monster player-pos"></div>
+    </div>
+
+    <!-- 7. Battle UI -->
+    <div id="ui-box" class="h-[42%] bg-slate-900 border-t border-white/10 p-4 flex flex-col z-50 hidden-screen">
+        <div id="log" class="log-box"></div>
+        <div id="controls" class="grid grid-cols-2 gap-3"></div>
+        <div id="result-ctrl" class="hidden flex-grow flex flex-col items-center justify-center gap-3">
+            <p id="result-text" class="text-2xl font-bold text-white"></p>
+            <button onclick="afterBattle()" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl">次へ</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========================================
+    // Audio System
+    // ========================================
+    
+    let audioContext = null;
+    let currentBGM = null;
+    let isMusicEnabled = true;
+
+    function initAudio() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    function playSound(type) {
+        if (!isMusicEnabled || !audioContext) return;
+        
+        const now = audioContext.currentTime;
+        
+        switch(type) {
+            case 'hit':
+                // パンチ音 - より迫力のある音
+                const hitOsc = audioContext.createOscillator();
+                const hitGain = audioContext.createGain();
+                const hitFilter = audioContext.createBiquadFilter();
+                
+                hitOsc.type = 'sawtooth';
+                hitFilter.type = 'lowpass';
+                hitFilter.frequency.value = 1000;
+                
+                hitOsc.connect(hitFilter);
+                hitFilter.connect(hitGain);
+                hitGain.connect(audioContext.destination);
+                
+                hitOsc.frequency.setValueAtTime(150, now);
+                hitOsc.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+                hitGain.gain.setValueAtTime(0.5, now);
+                hitGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                
+                hitOsc.start(now);
+                hitOsc.stop(now + 0.08);
+                break;
+                
+            case 'critical':
+                // クリティカル音 - 鋭い3連音
+                for (let i = 0; i < 3; i++) {
+                    const critOsc = audioContext.createOscillator();
+                    const critGain = audioContext.createGain();
+                    critOsc.type = 'square';
+                    critOsc.connect(critGain);
+                    critGain.connect(audioContext.destination);
+                    
+                    const t = now + (i * 0.05);
+                    critOsc.frequency.setValueAtTime(1200 + (i * 200), t);
+                    critGain.gain.setValueAtTime(0.4, t);
+                    critGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+                    
+                    critOsc.start(t);
+                    critOsc.stop(t + 0.08);
+                }
+                break;
+                
+            case 'miss':
+                // ミス音 - シュッという音
+                const missOsc = audioContext.createOscillator();
+                const missGain = audioContext.createGain();
+                missOsc.type = 'sine';
+                missOsc.connect(missGain);
+                missGain.connect(audioContext.destination);
+                
+                missOsc.frequency.setValueAtTime(600, now);
+                missOsc.frequency.linearRampToValueAtTime(200, now + 0.15);
+                missGain.gain.setValueAtTime(0.2, now);
+                missGain.gain.linearRampToValueAtTime(0, now + 0.15);
+                
+                missOsc.start(now);
+                missOsc.stop(now + 0.15);
+                break;
+                
+            case 'heal':
+                // 回復音 - 癒しの上昇音階
+                const healNotes = [523, 659, 784];
+                healNotes.forEach((freq, i) => {
+                    const healOsc = audioContext.createOscillator();
+                    const healGain = audioContext.createGain();
+                    healOsc.type = 'sine';
+                    healOsc.connect(healGain);
+                    healGain.connect(audioContext.destination);
+                    
+                    const t = now + (i * 0.1);
+                    healOsc.frequency.setValueAtTime(freq, t);
+                    healGain.gain.setValueAtTime(0.25, t);
+                    healGain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                    
+                    healOsc.start(t);
+                    healOsc.stop(t + 0.3);
+                });
+                break;
+        }
+    }
+
+    function playBattleBGM() {
+        if (!isMusicEnabled) return;
+        initAudio();
+        stopBGM();
+        
+        const bgm = createBattleMusic();
+        currentBGM = bgm;
+    }
+
+    function playVictoryFanfare() {
+        if (!isMusicEnabled) return;
+        initAudio();
+        stopBGM();
+        
+        const notes = [523, 587, 659, 784, 880, 1047];
+        const now = audioContext.currentTime;
+        
+        notes.forEach((freq, i) => {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            
+            osc.frequency.setValueAtTime(freq, now + i * 0.15);
+            gain.gain.setValueAtTime(0.3, now + i * 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.3);
+            
+            osc.start(now + i * 0.15);
+            osc.stop(now + i * 0.15 + 0.3);
+        });
+    }
+
+    function createBattleMusic() {
+        const bass = audioContext.createOscillator();
+        const bassGain = audioContext.createGain();
+        bass.type = 'sawtooth';
+        bass.frequency.setValueAtTime(110, audioContext.currentTime);
+        bassGain.gain.setValueAtTime(0.15, audioContext.currentTime);
+        bass.connect(bassGain);
+        bassGain.connect(audioContext.destination);
+        bass.start();
+        
+        const melody = audioContext.createOscillator();
+        const melodyGain = audioContext.createGain();
+        melody.type = 'square';
+        melodyGain.gain.setValueAtTime(0.08, audioContext.currentTime);
+        melody.connect(melodyGain);
+        melodyGain.connect(audioContext.destination);
+        melody.start();
+        
+        const notes = [330, 349, 392, 440, 392, 349, 330, 294];
+        let noteIndex = 0;
+        const tempo = 0.25;
+        
+        const melodyInterval = setInterval(() => {
+            if (!currentBGM) {
+                clearInterval(melodyInterval);
+                return;
+            }
+            melody.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
+            noteIndex = (noteIndex + 1) % notes.length;
+        }, tempo * 1000);
+        
+        const bassNotes = [110, 110, 146, 146];
+        let bassIndex = 0;
+        const bassInterval = setInterval(() => {
+            if (!currentBGM) {
+                clearInterval(bassInterval);
+                return;
+            }
+            bass.frequency.setValueAtTime(bassNotes[bassIndex], audioContext.currentTime);
+            bassIndex = (bassIndex + 1) % bassNotes.length;
+        }, tempo * 2 * 1000);
+        
+        return {
+            stop: () => {
+                clearInterval(melodyInterval);
+                clearInterval(bassInterval);
+                bass.stop();
+                melody.stop();
+            }
+        };
+    }
+
+    function playTitleBGM() {
+        if (!isMusicEnabled) return;
+        initAudio();
+        stopBGM();
+        
+        const melody = audioContext.createOscillator();
+        const melodyGain = audioContext.createGain();
+        melody.type = 'sine';
+        melodyGain.gain.setValueAtTime(0.06, audioContext.currentTime);
+        melody.connect(melodyGain);
+        melodyGain.connect(audioContext.destination);
+        melody.start();
+        
+        const notes = [523, 587, 659, 523, 698, 659, 587, 523];
+        let noteIndex = 0;
+        
+        const interval = setInterval(() => {
+            if (!currentBGM) {
+                clearInterval(interval);
+                return;
+            }
+            melody.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
+            noteIndex = (noteIndex + 1) % notes.length;
+        }, 600);
+        
+        currentBGM = {
+            stop: () => {
+                clearInterval(interval);
+                melody.stop();
+            }
+        };
+    }
+
+    function playMenuBGM() {
+        if (!isMusicEnabled) return;
+        initAudio();
+        stopBGM();
+        
+        const melody = audioContext.createOscillator();
+        const melodyGain = audioContext.createGain();
+        melody.type = 'triangle';
+        melodyGain.gain.setValueAtTime(0.05, audioContext.currentTime);
+        melody.connect(melodyGain);
+        melodyGain.connect(audioContext.destination);
+        melody.start();
+        
+        const notes = [440, 494, 523, 587, 659, 587, 523, 494];
+        let noteIndex = 0;
+        
+        const interval = setInterval(() => {
+            if (!currentBGM) {
+                clearInterval(interval);
+                return;
+            }
+            melody.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
+            noteIndex = (noteIndex + 1) % notes.length;
+        }, 500);
+        
+        currentBGM = {
+            stop: () => {
+                clearInterval(interval);
+                melody.stop();
+            }
+        };
+    }
+
+    function playStoryBGM() {
+        if (!isMusicEnabled) return;
+        initAudio();
+        stopBGM();
+        
+        const melody = audioContext.createOscillator();
+        const melodyGain = audioContext.createGain();
+        melody.type = 'sine';
+        melodyGain.gain.setValueAtTime(0.04, audioContext.currentTime);
+        melody.connect(melodyGain);
+        melodyGain.connect(audioContext.destination);
+        melody.start();
+        
+        const notes = [392, 440, 494, 523, 494, 440, 392, 349];
+        let noteIndex = 0;
+        
+        const interval = setInterval(() => {
+            if (!currentBGM) {
+                clearInterval(interval);
+                return;
+            }
+            melody.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
+            noteIndex = (noteIndex + 1) % notes.length;
+        }, 700);
+        
+        currentBGM = {
+            stop: () => {
+                clearInterval(interval);
+                melody.stop();
+            }
+        };
+    }
+
+    function stopBGM() {
+        if (currentBGM) {
+            currentBGM.stop();
+            currentBGM = null;
+        }
+    }
+
+    function toggleMusic() {
+        isMusicEnabled = !isMusicEnabled;
+        const btn = document.getElementById('music-toggle-btn');
+        if (btn) {
+            btn.textContent = isMusicEnabled ? '🔊' : '🔇';
+        }
+        if (!isMusicEnabled) {
+            stopBGM();
+        }
+    }
+
+    // ========================================
+    // Game Data
+    // ========================================
+    
+    const allSkills = [
+        // 基本技
+        { id: 0, name: "連撃", power: 40, accuracy: 100, pp: 20, category: "通常", desc: "素早い連続攻撃" },
+        { id: 1, name: "強撃", power: 60, accuracy: 90, pp: 15, category: "通常", desc: "力を込めた一撃" },
+        { id: 2, name: "乱打", power: 50, accuracy: 95, pp: 18, category: "通常", desc: "ランダムな打撃" },
+        { id: 3, name: "突進", power: 55, accuracy: 95, pp: 15, category: "通常", desc: "体当たり攻撃" },
+        
+        // 属性技
+        { id: 4, name: "猛毒の牙", power: 65, accuracy: 90, pp: 10, category: "毒", desc: "猛毒で蝕む" },
+        { id: 5, name: "烈火の息", power: 70, accuracy: 85, pp: 12, category: "炎", desc: "灼熱の炎" },
+        { id: 6, name: "氷結の槍", power: 65, accuracy: 90, pp: 12, category: "氷", desc: "凍てつく一撃" },
+        { id: 7, name: "落雷", power: 75, accuracy: 85, pp: 10, category: "雷", desc: "雷を落とす" },
+        { id: 8, name: "疾風斬", power: 60, accuracy: 95, pp: 12, category: "風", desc: "風の刃" },
+        { id: 9, name: "水流撃", power: 65, accuracy: 90, pp: 12, category: "水", desc: "水の奔流" },
+        { id: 10, name: "闇の波動", power: 70, accuracy: 85, pp: 10, category: "闇", desc: "闇のエネルギー" },
+        
+        // 特殊技
+        { id: 11, name: "幻惑の術", power: 50, accuracy: 100, pp: 15, category: "特殊", desc: "相手を惑わす" },
+        { id: 12, name: "再生", power: 0, accuracy: 100, pp: 8, category: "回復", desc: "HPを回復", isHeal: true },
+        { id: 13, name: "鉄壁の構え", power: 0, accuracy: 100, pp: 10, category: "補助", desc: "防御力上昇", isBuff: true },
+        
+        // 個性技（各キャラ専用）
+        { id: 26, name: "死の接吻", power: 55, accuracy: 95, pp: 12, category: "毒", desc: "致死の毒を注入" },
+        { id: 27, name: "天罰の光", power: 75, accuracy: 90, pp: 8, category: "光", desc: "神聖な光の矢" },
+        { id: 28, name: "影縫い", power: 45, accuracy: 100, pp: 15, category: "闇", desc: "影を操り動きを封じる" },
+        { id: 29, name: "幻影分身", power: 0, accuracy: 100, pp: 8, category: "補助", desc: "回避率アップ", isBuff: true },
+        { id: 30, name: "四腕乱舞", power: 35, accuracy: 100, pp: 20, category: "通常", desc: "4本腕で連打" },
+        { id: 31, name: "呪詛返し", power: 50, accuracy: 100, pp: 12, category: "特殊", desc: "呪いを跳ね返す" },
+        { id: 32, name: "蝿の群れ", power: 40, accuracy: 100, pp: 18, category: "毒", desc: "無数の蝿で攻撃" },
+        { id: 33, name: "腐敗の息", power: 60, accuracy: 95, pp: 10, category: "毒", desc: "腐敗臭の息" },
+        { id: 34, name: "火柱", power: 80, accuracy: 80, pp: 10, category: "炎", desc: "巨大な炎の柱" },
+        { id: 35, name: "火遁の術", power: 0, accuracy: 100, pp: 8, category: "補助", desc: "炎で身を守る", isBuff: true },
+        { id: 36, name: "蛇の睨み", power: 0, accuracy: 90, pp: 10, category: "補助", desc: "威圧で攻撃力ダウン", isBuff: true },
+        { id: 37, name: "大蛇の巻きつき", power: 55, accuracy: 100, pp: 12, category: "通常", desc: "締め上げる" },
+        { id: 38, name: "雷撃", power: 65, accuracy: 90, pp: 12, category: "雷", desc: "電撃を放つ" },
+        { id: 39, name: "暴風", power: 70, accuracy: 85, pp: 10, category: "風", desc: "激しい風" },
+        { id: 40, name: "羽ばたき", power: 45, accuracy: 100, pp: 15, category: "風", desc: "翼で突風を起こす" },
+        { id: 41, name: "急降下", power: 75, accuracy: 90, pp: 10, category: "通常", desc: "上空から急襲" },
+        { id: 42, name: "吹雪", power: 70, accuracy: 85, pp: 12, category: "氷", desc: "凍える吹雪" },
+        { id: 43, name: "氷の壁", power: 0, accuracy: 100, pp: 8, category: "補助", desc: "氷で防御", isBuff: true },
+        { id: 44, name: "変化の術", power: 0, accuracy: 100, pp: 10, category: "補助", desc: "姿を変える", isBuff: true },
+        { id: 45, name: "妖狐火", power: 65, accuracy: 90, pp: 12, category: "炎", desc: "幻惑する炎" },
+        { id: 46, name: "牙", power: 60, accuracy: 95, pp: 15, category: "通常", desc: "鋭い牙で噛む" },
+        { id: 47, name: "毒霧", power: 50, accuracy: 95, pp: 12, category: "毒", desc: "毒の霧を放つ" },
+        
+        // 必殺技
+        { id: 14, name: "死の天使", power: 140, accuracy: 85, pp: 3, category: "必殺", desc: "即死級の猛毒", isSpecial: true },
+        { id: 15, name: "隠形奇襲", power: 130, accuracy: 90, pp: 3, category: "必殺", desc: "不可視の一撃", isSpecial: true },
+        { id: 16, name: "四刀流・羅刹", power: 135, accuracy: 85, pp: 3, category: "必殺", desc: "四本腕の連撃", isSpecial: true },
+        { id: 17, name: "腐敗の王", power: 125, accuracy: 90, pp: 4, category: "必殺", desc: "全てを腐らせる", isSpecial: true },
+        { id: 18, name: "煉獄の炎", power: 145, accuracy: 80, pp: 3, category: "必殺", desc: "地獄の業火", isSpecial: true },
+        { id: 19, name: "八岐の猛襲", power: 150, accuracy: 75, pp: 2, category: "必殺", desc: "八つ首の連撃", isSpecial: true },
+        { id: 20, name: "嵐神の裁き", power: 135, accuracy: 85, pp: 3, category: "必殺", desc: "雷と暴風", isSpecial: true },
+        { id: 21, name: "神風の翼", power: 130, accuracy: 90, pp: 3, category: "必殺", desc: "超音速突撃", isSpecial: true },
+        { id: 22, name: "絶対零度", power: 140, accuracy: 80, pp: 3, category: "必殺", desc: "全てを凍結", isSpecial: true },
+        { id: 23, name: "九尾火炎舞", power: 130, accuracy: 85, pp: 3, category: "必殺", desc: "妖狐の炎", isSpecial: true },
+        { id: 24, name: "蛇王の締め", power: 135, accuracy: 85, pp: 3, category: "必殺", desc: "拘束と猛毒", isSpecial: true },
+        { id: 25, name: "鬼神乱舞", power: 145, accuracy: 85, pp: 3, category: "必殺", desc: "最強の怪力", isSpecial: true },
+    ];
+
+    const charactersData = [
+        { 
+            id: 'samael', name: "サマエル", type: "天使/悪魔", sprite: "😈", 
+            hp: 310, atk: 70, def: 45,
+            skills: [0, 1, 4, 10, 11, 12, 13, 14],
+            skillMods: { 0: {power: 45}, 1: {power: 65}, 4: {power: 70, accuracy: 95}, 14: {power: 145} },
+            item: { id: 'death-poison', name: '☠️ 死の猛毒', desc: '相手に猛毒を与え、攻撃力アップ', uses: 1 },
+            story: "死の天使として恐れられる堕天使。12枚の翼と猛毒を操る。",
+            unlocked: true
+        },
+        { 
+            id: 'indrajit', name: "インドラジット", type: "戦士", sprite: "⚡", 
+            hp: 290, atk: 75, def: 42,
+            skills: [0, 2, 7, 8, 11, 13, 15, 15],
+            skillMods: { 0: {power: 42}, 8: {power: 65, accuracy: 100}, 15: {accuracy: 95, pp: 4} },
+            item: { id: 'invisible-cloak', name: '👻 隠形の衣', desc: '次の攻撃を回避し、反撃ダメージ', uses: 1 },
+            story: "ラーヴァナの息子。姿を消す隠形術の使い手。",
+            unlocked: true
+        },
+        { 
+            id: 'sukuna', name: "りょうめんすくな", type: "異形神", sprite: "👹", 
+            hp: 330, atk: 72, def: 48,
+            skills: [30, 1, 31, 11, 8, 12, 13, 16],
+            skillMods: { 30: {power: 38, pp: 22}, 1: {power: 70, accuracy: 95}, 31: {power: 55, accuracy: 100, pp: 14}, 16: {power: 145} },
+            item: { id: 'four-arms-power', name: '👐 四腕の力', desc: 'HP30%回復、攻撃・防御大幅アップ', uses: 1 },
+            story: "飛騨の異形。前後に顔があり四本の腕を持つ。",
+            unlocked: false
+        },
+        { 
+            id: 'beelzebub', name: "ベルゼブブ", type: "魔王", sprite: "🪰", 
+            hp: 300, atk: 65, def: 50,
+            skills: [32, 33, 4, 10, 11, 12, 13, 17],
+            skillMods: { 32: {power: 45, pp: 20}, 33: {power: 68, pp: 12}, 4: {power: 72}, 10: {power: 75}, 17: {power: 130, pp: 5} },
+            item: { id: 'plague-swarm', name: '🦟 腐敗の群れ', desc: '相手に継続ダメージ、防御力ダウン', uses: 1 },
+            story: "ハエの王。腐敗を司り、魔力で相手を蝕む。",
+            unlocked: true
+        },
+        { 
+            id: 'ifrit', name: "イフリート", type: "炎精霊", sprite: "🔥", 
+            hp: 320, atk: 68, def: 40,
+            skills: [34, 5, 1, 35, 11, 12, 13, 18],
+            skillMods: { 34: {power: 88, accuracy: 82, pp: 8}, 5: {power: 78, accuracy: 90}, 35: {pp: 6}, 18: {power: 155} },
+            item: { id: 'inferno-core', name: '🌋 煉獄の核', desc: '攻撃力特大アップ、次の攻撃威力2倍', uses: 1 },
+            story: "炎の魔人。物理攻撃を無効化する炎の体。",
+            unlocked: true
+        },
+        { 
+            id: 'orochi', name: "ヤマタノオロチ", type: "大蛇", sprite: "🐍", 
+            hp: 380, atk: 62, def: 55,
+            skills: [37, 4, 9, 36, 11, 12, 13, 19],
+            skillMods: { 37: {power: 62, accuracy: 100, pp: 14}, 4: {power: 70}, 9: {power: 72}, 19: {power: 160, pp: 3} },
+            item: { id: 'eight-heads', name: '🐲 八首の力', desc: 'HP40%回復、攻撃力大幅アップ', uses: 1 },
+            story: "日本最大の怪物。八つの頭を持つ巨大な蛇。",
+            unlocked: false
+        },
+        { 
+            id: 'furfur', name: "フルフル", type: "魔王", sprite: "⛈️", 
+            hp: 300, atk: 70, def: 45,
+            skills: [38, 39, 7, 8, 11, 12, 13, 20],
+            skillMods: { 38: {power: 70, pp: 14}, 39: {power: 75, accuracy: 88}, 7: {power: 85, accuracy: 90}, 20: {power: 145} },
+            item: { id: 'thunder-storm', name: '⚡ 雷嵐の書', desc: '相手を麻痺させ、攻撃力アップ', uses: 1 },
+            story: "嵐の伯爵。雷と暴風を操る魔王。",
+            unlocked: false
+        },
+        { 
+            id: 'anzu', name: "アンズー", type: "怪鳥", sprite: "🦅", 
+            hp: 280, atk: 73, def: 40,
+            skills: [40, 41, 8, 3, 11, 12, 13, 21],
+            skillMods: { 40: {power: 48, accuracy: 100, pp: 16}, 41: {power: 80, pp: 12}, 8: {power: 68, accuracy: 100}, 21: {accuracy: 95} },
+            item: { id: 'destiny-tablet', name: '📜 運命の盤', desc: '次の攻撃が必中、クリティカル確定', uses: 1 },
+            story: "メソポタミアの怪鳥。運命の盤を盗んだ知恵者。",
+            unlocked: false
+        },
+        { 
+            id: 'frost', name: "フロストジャイアント", type: "巨人", sprite: "❄️", 
+            hp: 360, atk: 65, def: 62,
+            skills: [1, 3, 6, 9, 11, 12, 13, 22],
+            skillMods: { 1: {power: 65}, 6: {power: 70, accuracy: 95}, 22: {power: 145, accuracy: 85} },
+            item: { id: 'ice-armor', name: '🧊 氷結の鎧', desc: '防御力特大アップ、相手の攻撃力ダウン', uses: 1 },
+            story: "北欧の霜の巨人。触れるもの全てを凍らせる。",
+            unlocked: false
+        },
+        { 
+            id: 'kyuubi', name: "九尾の狐", type: "妖怪", sprite: "🦊", 
+            hp: 295, atk: 68, def: 47,
+            skills: [45, 44, 5, 11, 2, 12, 13, 23],
+            skillMods: { 45: {power: 70, pp: 14}, 44: {pp: 8}, 5: {power: 78}, 11: {accuracy: 100, pp: 18}, 23: {power: 138} },
+            item: { id: 'fox-fire', name: '🧿 狐火', desc: '相手に火傷付与、攻撃力アップ', uses: 1 },
+            story: "強大な妖力を持つ狐。変幻自在の術を使う。",
+            unlocked: true
+        },
+        { 
+            id: 'naga', name: "ナーガ", type: "蛇神", sprite: "🐉", 
+            hp: 330, atk: 66, def: 52,
+            skills: [46, 47, 4, 9, 11, 12, 13, 24],
+            skillMods: { 46: {power: 65, pp: 16}, 47: {power: 58, pp: 14}, 4: {power: 72, pp: 12}, 9: {power: 72, accuracy: 95}, 24: {power: 142} },
+            item: { id: 'serpent-scale', name: '🐉 蛇鱗', desc: '防御力が上がり次の攻撃を無効化', uses: 1 },
+            story: "インドの蛇神。猛毒と水を操る。",
+            unlocked: false
+        },
+        { 
+            id: 'shuten', name: "酒呑童子", type: "鬼", sprite: "👺", 
+            hp: 350, atk: 78, def: 48,
+            skills: [1, 3, 10, 2, 11, 12, 13, 25],
+            skillMods: { 1: {power: 70, accuracy: 95}, 3: {power: 65, pp: 16}, 10: {power: 78}, 2: {power: 58, pp: 20}, 25: {power: 155} },
+            item: { id: 'oni-sake', name: '🍶 鬼の酒', desc: 'HP35%回復、攻撃・防御アップ', uses: 1 },
+            story: "日本最強の鬼。凄まじい怪力の持ち主。",
+            unlocked: false
+        },
+    ];
+
+    const storyChapters = [
+        {
+            id: 0,
+            title: "序章：集いし戦士たち",
+            description: "12人の最強戦士が一堂に会する...",
+            unlockChar: null,
+            dialog: [
+                { speaker: "samael", name: "サマエル", text: "ふん...こんな場所に呼び出されるとは。" },
+                { speaker: "narrator", name: "ナレーター", text: "謎の声に導かれ、12人の戦士が集まった。" },
+                { speaker: "samael", name: "サマエル", text: "最強を決める戦いだと？面白い..." },
+            ],
+            opponent: null
+        },
+        {
+            id: 1,
+            title: "第1章：雷の戦士",
+            description: "隠形術の使い手との戦い",
+            unlockChar: "indrajit",
+            dialog: [
+                { speaker: "indrajit", name: "インドラジット", text: "見えぬ敵ほど恐ろしいものはない..." },
+                { speaker: "indrajit", name: "インドラジット", text: "我が隠形術、突破できるか？" },
+            ],
+            opponent: "indrajit"
+        },
+        {
+            id: 2,
+            title: "第2章：異形の神",
+            description: "四本腕の戦士との対決",
+            unlockChar: "sukuna",
+            dialog: [
+                { speaker: "sukuna", name: "りょうめんすくな", text: "前後に死角なし...四本の腕で貴様を斬る。" },
+            ],
+            opponent: "sukuna"
+        },
+        {
+            id: 3,
+            title: "第3章：腐敗の王",
+            description: "ハエの王との戦い",
+            unlockChar: "beelzebub",
+            dialog: [
+                { speaker: "beelzebub", name: "ベルゼブブ", text: "全ては腐り、朽ち果てる...それが私の力だ。" },
+            ],
+            opponent: "beelzebub"
+        },
+        {
+            id: 4,
+            title: "第4章：炎の魔人",
+            description: "煉獄の炎を操る精霊",
+            unlockChar: "ifrit",
+            dialog: [
+                { speaker: "ifrit", name: "イフリート", text: "この炎、お前の剣では切れまい！" },
+            ],
+            opponent: "ifrit"
+        },
+        {
+            id: 5,
+            title: "第5章：八岐大蛇",
+            description: "日本最大の怪物",
+            unlockChar: "orochi",
+            dialog: [
+                { speaker: "orochi", name: "ヤマタノオロチ", text: "八つの首で貴様を飲み込む！" },
+            ],
+            opponent: "orochi"
+        },
+        {
+            id: 6,
+            title: "第6章：嵐の支配者",
+            description: "雷と暴風の魔王",
+            unlockChar: "furfur",
+            dialog: [
+                { speaker: "furfur", name: "フルフル", text: "嵐よ、吹き荒れろ！" },
+            ],
+            opponent: "furfur"
+        },
+        {
+            id: 7,
+            title: "第7章：運命の鳥",
+            description: "神速の怪鳥との空中戦",
+            unlockChar: "anzu",
+            dialog: [
+                { speaker: "anzu", name: "アンズー", text: "地に縛られた者に、我は捉えられぬ！" },
+            ],
+            opponent: "anzu"
+        },
+        {
+            id: 8,
+            title: "第8章：氷の巨人",
+            description: "絶対零度の力",
+            unlockChar: "frost",
+            dialog: [
+                { speaker: "frost", name: "フロストジャイアント", text: "凍てつく冷気で全てを止める..." },
+            ],
+            opponent: "frost"
+        },
+        {
+            id: 9,
+            title: "第9章：妖狐の幻術",
+            description: "九尾の狐との知恵比べ",
+            unlockChar: "kyuubi",
+            dialog: [
+                { speaker: "kyuubi", name: "九尾の狐", text: "ふふ...何が本物か、見極められるかしら？" },
+            ],
+            opponent: "kyuubi"
+        },
+        {
+            id: 10,
+            title: "第10章：蛇神の試練",
+            description: "猛毒の蛇神",
+            unlockChar: "naga",
+            dialog: [
+                { speaker: "naga", name: "ナーガ", text: "我が毒牙、耐えられるか？" },
+            ],
+            opponent: "naga"
+        },
+        {
+            id: 11,
+            title: "最終章：鬼神降臨",
+            description: "最強の鬼との決戦",
+            unlockChar: "shuten",
+            dialog: [
+                { speaker: "shuten", name: "酒呑童子", text: "ついに来たか...最強を決めようぞ！" },
+                { speaker: "shuten", name: "酒呑童子", text: "この怪力、受けてみよ！" },
+            ],
+            opponent: "shuten"
+        },
+    ];
+
+    // ========================================
+    // Game State
+    // ========================================
+    
+    let gameMode = null;
+    let currentChapter = 0;
+    let selectedCharacter = null;
+    let selectedSkills = [];
+    let player = null;
+    let enemy = null;
+    let isBusy = false;
+    let dialogIndex = 0;
+    let currentDialog = [];
+    let storyProgress = 0; // 0-11
+    let difficulty = 'normal'; // 'easy', 'normal', 'hard'
+    let playerItem = null; // プレイヤーのアイテム
+    let itemUsed = false; // アイテム使用済みフラグ
+    let itemEffects = {}; // アイテム効果状態
+    
+    // Battle events
+    let turnCount = 0;
+    const battleEvents = [
+        {
+            id: 'sudden-rain',
+            name: '☔ 突然の雨',
+            message: '突然雨が降り出した！水タイプの攻撃力が上がった！',
+            effect: () => {
+                if (player.type === '水') player.atk = Math.floor(player.atk * 1.3);
+                if (enemy.type === '水') enemy.atk = Math.floor(enemy.atk * 1.3);
+            }
+        },
+        {
+            id: 'sunny-day',
+            name: '☀️ 晴天',
+            message: '日差しが強くなった！火タイプの攻撃力が上がった！',
+            effect: () => {
+                if (player.type === '火') player.atk = Math.floor(player.atk * 1.3);
+                if (enemy.type === '火') enemy.atk = Math.floor(enemy.atk * 1.3);
+            }
+        },
+        {
+            id: 'strong-wind',
+            name: '🌬️ 強風',
+            message: '強風が吹き荒れている！命中率が低下した！',
+            effect: () => {
+                player.moveSet.forEach(m => m.accuracy = Math.max(50, m.accuracy - 15));
+                enemy.moveSet.forEach(m => m.accuracy = Math.max(50, m.accuracy - 15));
+            }
+        },
+        {
+            id: 'earthquake',
+            name: '🌋 地震',
+            message: '地震が発生！双方にダメージ！',
+            effect: () => {
+                const damage = Math.floor(player.maxHp * 0.1);
+                player.hp = Math.max(1, player.hp - damage);
+                enemy.hp = Math.max(1, enemy.hp - damage);
+                updateHP(player);
+                updateHP(enemy);
+            }
+        },
+        {
+            id: 'mysterious-light',
+            name: '✨ 不思議な光',
+            message: '不思議な光が降り注いだ！HPが少し回復した！',
+            effect: () => {
+                const heal = Math.floor(player.maxHp * 0.15);
+                player.hp = Math.min(player.maxHp, player.hp + heal);
+                enemy.hp = Math.min(enemy.maxHp, enemy.hp + heal);
+                updateHP(player);
+                updateHP(enemy);
+            }
+        },
+        {
+            id: 'fighting-spirit',
+            name: '🔥 闘志覚醒',
+            message: `${Math.random() < 0.5 ? 'player' : 'enemy'}の闘志が燃え上がった！攻撃力が大幅アップ！`,
+            effect: () => {
+                const target = Math.random() < 0.5 ? player : enemy;
+                target.atk = Math.floor(target.atk * 1.5);
+            }
+        },
+        {
+            id: 'barrier',
+            name: '🛡️ 防御バリア',
+            message: `${Math.random() < 0.5 ? 'player' : 'enemy'}にバリアが張られた！防御力が上がった！`,
+            effect: () => {
+                const target = Math.random() < 0.5 ? player : enemy;
+                target.def = Math.floor(target.def * 1.4);
+            }
+        },
+        {
+            id: 'pp-recovery',
+            name: '💫 PP回復',
+            message: '不思議な力がPPを回復させた！',
+            effect: () => {
+                player.moveSet.forEach(m => m.currentPP = Math.min(m.pp, m.currentPP + 2));
+                updateControls();
+            }
+        },
+        {
+            id: 'speed-up',
+            name: '⚡ スピードアップ',
+            message: '場のエネルギーが高まった！ターンが続けてできる！',
+            effect: () => {
+                // このイベントでは敵の攻撃をスキップするフラグを返す
+                return { skipEnemyTurn: true };
+            }
+        },
+        {
+            id: 'confusion',
+            name: '🌀 混乱',
+            message: '場が混乱している！次の攻撃が不確実に！',
+            effect: () => {
+                return { confusedTurn: true };
+            }
+        }
+    ];
+    
+    // Tournament state
+    let tournamentWins = 0;
+    let tournamentBattles = 0;
+    let tournamentOpponents = [];
+    let currentOpponentIndex = 0;
+    let playerMaxSkills = []; // 元々の技PPを保持
+
+    // ========================================
+    // Difficulty System
+    // ========================================
+    
+    function setDifficulty(level) {
+        difficulty = level;
+        
+        // Update UI
+        ['easy', 'normal', 'hard'].forEach(d => {
+            const btn = document.getElementById(`diff-${d}`);
+            if (d === level) {
+                btn.className = 'px-4 py-1 text-sm rounded-full border-2 transition-all';
+                if (d === 'easy') {
+                    btn.className += ' bg-emerald-600 text-white border-emerald-400';
+                } else if (d === 'normal') {
+                    btn.className += ' bg-indigo-600 text-white border-indigo-400';
+                } else {
+                    btn.className += ' bg-rose-600 text-white border-rose-400';
+                }
+            } else {
+                btn.className = 'px-4 py-1 text-sm rounded-full bg-slate-700 text-slate-300 border border-slate-600 hover:border-slate-500 transition-all';
+            }
+        });
+    }
+    
+    function applyDifficulty(character) {
+        const multipliers = {
+            easy: { hp: 0.8, atk: 0.8, def: 1.0 },
+            normal: { hp: 1.0, atk: 1.0, def: 1.0 },
+            hard: { hp: 1.3, atk: 1.2, def: 1.1 }
+        };
+        
+        const mult = multipliers[difficulty];
+        return {
+            ...character,
+            hp: Math.floor(character.hp * mult.hp),
+            maxHp: Math.floor(character.hp * mult.hp),
+            atk: Math.floor(character.atk * mult.atk),
+            def: Math.floor(character.def * mult.def)
+        };
+    }
+
+    // ========================================
+    // Save/Load
+    // ========================================
+    
+    function saveProgress() {
+        localStorage.setItem('saikyouou_story_progress', storyProgress.toString());
+        const unlockedChars = charactersData.filter(c => c.unlocked).map(c => c.id);
+        localStorage.setItem('saikyouou_unlocked', JSON.stringify(unlockedChars));
+    }
+
+    function loadProgress() {
+        const saved = localStorage.getItem('saikyouou_story_progress');
+        if (saved) {
+            storyProgress = parseInt(saved);
+        }
+        const unlocked = localStorage.getItem('saikyouou_unlocked');
+        if (unlocked) {
+            const ids = JSON.parse(unlocked);
+            charactersData.forEach(c => {
+                if (ids.includes(c.id)) c.unlocked = true;
+            });
+        }
+        updateProgressBar();
+    }
+
+    function updateProgressBar() {
+        const percent = Math.floor((storyProgress / 11) * 100);
+        document.getElementById('progress-text').textContent = percent;
+        document.getElementById('progress-bar-fill').style.width = percent + '%';
+    }
+
+    // ========================================
+    // Navigation
+    // ========================================
+    
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden-screen'));
+        document.getElementById(screenId).classList.remove('hidden-screen');
+    }
+
+    function backToTitle() {
+        showScreen('title-screen');
+        updateProgressBar();
+        playTitleBGM();
+    }
+
+    function confirmReturnToMenu() {
+        if (isBusy) return;
+        if (confirm('バトルを中断してメニューに戻りますか？')) {
+            stopBGM();
+            isBusy = false;
+            player = null;
+            enemy = null;
+            backToTitle();
+        }
+    }
+
+    function backToMode() {
+        if (gameMode === 'story') {
+            showScreen('story-screen');
+            playStoryBGM();
+        } else if (gameMode === 'free' || gameMode === 'custom') {
+            backToTitle();
+        } else {
+            showScreen('selection-screen');
+            playMenuBGM();
+        }
+    }
+
+    function backToSelection() {
+        if (gameMode === 'free' || gameMode === 'custom') {
+            showScreen('selection-screen');
+            initCharacterSelection();
+        } else {
+            showScreen('selection-screen');
+        }
+        selectedSkills = [];
+        playMenuBGM();
+    }
+
+    // ========================================
+    // Mode Selection
+    // ========================================
+    
+    function selectMode(mode) {
+        gameMode = mode;
+        if (mode === 'story') {
+            showScreen('story-screen');
+            initStoryScreen();
+            playStoryBGM();
+        } else if (mode === 'tournament') {
+            showScreen('selection-screen');
+            initCharacterSelection();
+            playMenuBGM();
+        } else {
+            showScreen('selection-screen');
+            initCharacterSelection();
+            playMenuBGM();
+        }
+    }
+
+    function initStoryScreen() {
+        const list = document.getElementById('chapter-list');
+        list.innerHTML = '';
+        
+        storyChapters.forEach((chapter, idx) => {
+            const isLocked = idx > storyProgress;
+            const div = document.createElement('div');
+            div.className = `character-card ${isLocked ? 'locked' : ''}`;
+            
+            if (!isLocked) {
+                div.onclick = () => startChapter(idx);
+            }
+            
+            div.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="text-4xl">${isLocked ? '🔒' : '📖'}</div>
+                    <div class="flex-grow">
+                        <h3 class="text-white font-bold mb-1">${chapter.title}</h3>
+                        <p class="text-slate-400 text-sm">${chapter.description}</p>
+                        ${isLocked ? '<p class="text-rose-400 text-xs mt-1">※前章をクリアで解放</p>' : ''}
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function startChapter(chapterIdx) {
+        currentChapter = chapterIdx;
+        const chapter = storyChapters[chapterIdx];
+        
+        // Show dialog
+        currentDialog = chapter.dialog;
+        dialogIndex = 0;
+        showDialog();
+    }
+
+    function showDialog() {
+        const dialog = currentDialog[dialogIndex];
+        showScreen('dialog-screen');
+        
+        const sprite = dialog.speaker === 'narrator' ? '📜' : 
+                      charactersData.find(c => c.id === dialog.speaker)?.sprite || '❓';
+        
+        document.getElementById('dialog-sprite').textContent = sprite;
+        document.getElementById('dialog-name').textContent = dialog.name;
+        document.getElementById('dialog-text').textContent = dialog.text;
+    }
+
+    function nextDialog() {
+        dialogIndex++;
+        if (dialogIndex < currentDialog.length) {
+            showDialog();
+        } else {
+            // Dialog finished, go to character selection or battle
+            const chapter = storyChapters[currentChapter];
+            if (chapter.opponent) {
+                showScreen('selection-screen');
+                initCharacterSelection();
+            } else {
+                // No battle, just advance
+                advanceStory();
+            }
+        }
+    }
+
+    function advanceStory() {
+        if (currentChapter === storyProgress) {
+            storyProgress++;
+            const chapter = storyChapters[currentChapter];
+            if (chapter.unlockChar) {
+                const char = charactersData.find(c => c.id === chapter.unlockChar);
+                if (char) char.unlocked = true;
+            }
+            saveProgress();
+        }
+    }
+    
+    function showStoryContinueScreen() {
+        advanceStory();
+        
+        if (storyProgress >= storyChapters.length) {
+            // 全章クリア
+            setTimeout(() => {
+                alert('🎊 全ての章をクリアしました！\nおめでとうございます！');
+                backToTitle();
+            }, 500);
+        } else {
+            const nextChapter = storyChapters[storyProgress];
+            document.getElementById('continue-message').textContent = `次の章「${nextChapter.title}」に進みますか？`;
+            showScreen('story-continue-screen');
+        }
+    }
+    
+    function continueStory() {
+        currentChapter = storyProgress;
+        currentDialog = storyChapters[currentChapter].dialog;
+        dialogIndex = 0;
+        showScreen('dialog-screen');
+        showDialog();
+    }
+
+    // ========================================
+    // Character Selection
+    // ========================================
+    
+    function initCharacterSelection() {
+        const grid = document.getElementById('character-grid');
+        grid.innerHTML = '';
+        
+        charactersData.forEach(char => {
+            const isLocked = !char.unlocked;
+            const div = document.createElement('div');
+            div.className = `character-card ${isLocked ? 'locked' : ''}`;
+            
+            if (!isLocked) {
+                div.onclick = () => selectCharacter(char.id);
+            }
+            
+            div.innerHTML = `
+                ${isLocked ? '<span class="badge bg-slate-700 text-slate-300">🔒 未解放</span>' : ''}
+                <div class="flex items-center gap-4">
+                    <span class="text-5xl">${char.sprite}</span>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-lg text-white">${char.name}</span>
+                            <span class="text-[9px] border border-slate-500 px-2 py-0.5 rounded-full text-slate-300">${char.type}</span>
+                        </div>
+                        <div class="flex gap-3 text-[10px] text-slate-400 font-bold mb-2">
+                            <span>HP:${char.hp}</span>
+                            <span>ATK:${char.atk}</span>
+                            <span>DEF:${char.def}</span>
+                        </div>
+                        <p class="text-xs text-slate-500">${char.story}</p>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(div);
+        });
+    }
+
+    function selectCharacter(charId) {
+        selectedCharacter = charactersData.find(c => c.id === charId);
+        showScreen('skill-screen');
+        initSkillCustomize();
+    }
+
+    // ========================================
+    // Skill Customize
+    // ========================================
+    
+    function initSkillCustomize() {
+        selectedSkills = [];
+        document.getElementById('selected-char-sprite').textContent = selectedCharacter.sprite;
+        document.getElementById('selected-char-name').textContent = selectedCharacter.name;
+        document.getElementById('selected-char-type').textContent = selectedCharacter.type;
+        
+        const list = document.getElementById('skill-list');
+        list.innerHTML = '';
+        
+        selectedCharacter.skills.forEach((skillId, idx) => {
+            const baseSkill = allSkills.find(s => s.id === skillId);
+            const skill = { ...baseSkill };
+            
+            // キャラ固有の調整を適用
+            if (selectedCharacter.skillMods && selectedCharacter.skillMods[skillId]) {
+                const mods = selectedCharacter.skillMods[skillId];
+                if (mods.power !== undefined) skill.power = mods.power;
+                if (mods.accuracy !== undefined) skill.accuracy = mods.accuracy;
+                if (mods.pp !== undefined) skill.pp = mods.pp;
+            }
+            
+            const div = document.createElement('div');
+            div.className = 'skill-slot';
+            div.dataset.skillIdx = idx;
+            div.onclick = () => toggleSkill(idx);
+            
+            const categoryColor = 
+                skill.category === '必殺' ? 'text-yellow-400' :
+                skill.category === '回復' ? 'text-green-400' :
+                skill.category === '補助' ? 'text-blue-400' :
+                'text-slate-300';
+            
+            div.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="text-white font-bold">${skill.isSpecial ? '★' : ''}${skill.name}</span>
+                        <span class="${categoryColor} text-xs ml-2">${skill.category}</span>
+                    </div>
+                    <span class="text-xs text-slate-400">PP:${skill.pp}</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">${skill.desc}</p>
+                <div class="flex gap-2 text-[10px] text-slate-500 mt-1">
+                    ${skill.power > 0 ? `<span>威力:${skill.power}</span>` : ''}
+                    <span>命中:${skill.accuracy}%</span>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+        
+        updateSkillSelection();
+    }
+
+    function toggleSkill(idx) {
+        if (selectedSkills.includes(idx)) {
+            selectedSkills = selectedSkills.filter(i => i !== idx);
+        } else {
+            if (selectedSkills.length < 4) {
+                selectedSkills.push(idx);
+            }
+        }
+        updateSkillSelection();
+    }
+
+    function updateSkillSelection() {
+        document.querySelectorAll('.skill-slot').forEach(slot => {
+            const idx = parseInt(slot.dataset.skillIdx);
+            if (selectedSkills.includes(idx)) {
+                slot.classList.add('selected');
+            } else {
+                slot.classList.remove('selected');
+            }
+            
+            if (selectedSkills.length >= 4 && !selectedSkills.includes(idx)) {
+                slot.classList.add('disabled');
+            } else {
+                slot.classList.remove('disabled');
+            }
+        });
+        
+        document.getElementById('selected-count').textContent = selectedSkills.length;
+        document.getElementById('confirm-skills-btn').disabled = selectedSkills.length !== 4;
+    }
+
+    function confirmSkills() {
+        if (selectedSkills.length !== 4) return;
+        
+        if (gameMode === 'tournament') {
+            initTournament();
+        } else {
+            startBattle();
+        }
+    }
+
+    // ========================================
+    // Tournament System
+    // ========================================
+    
+    function initTournament() {
+        tournamentWins = 0;
+        tournamentBattles = 0;
+        currentOpponentIndex = 0;
+        
+        // ランダムな対戦相手を選択（自分以外の解放キャラ）
+        const availableOpponents = charactersData.filter(c => c.unlocked && c.id !== selectedCharacter.id);
+        tournamentOpponents = [];
+        
+        // 8人の対戦相手をランダムに選択（重複あり）
+        for (let i = 0; i < 8; i++) {
+            const randomOpponent = availableOpponents[Math.floor(Math.random() * availableOpponents.length)];
+            tournamentOpponents.push(randomOpponent);
+        }
+        
+        // 選択した技の初期PPを保存
+        playerMaxSkills = selectedSkills.map(idx => {
+            const skillId = selectedCharacter.skills[idx];
+            const baseSkill = allSkills.find(s => s.id === skillId);
+            const skill = { ...baseSkill };
+            
+            if (selectedCharacter.skillMods && selectedCharacter.skillMods[skillId]) {
+                const mods = selectedCharacter.skillMods[skillId];
+                if (mods.pp !== undefined) skill.pp = mods.pp;
+            }
+            return { idx, maxPP: skill.pp };
+        });
+        
+        showTournamentScreen();
+    }
+    
+    function showTournamentScreen() {
+        showScreen('tournament-screen');
+        playMenuBGM();
+        
+        document.getElementById('tournament-char-sprite').textContent = selectedCharacter.sprite;
+        document.getElementById('tournament-char-name').textContent = selectedCharacter.name;
+        document.getElementById('tournament-wins').textContent = tournamentWins;
+        document.getElementById('tournament-hp-display').textContent = '100%';
+        
+        const battlesUntilPPRecover = 3 - (tournamentBattles % 3);
+        document.getElementById('tournament-pp-display').textContent = `${battlesUntilPPRecover}戦`;
+        
+        const nextOpponent = tournamentOpponents[currentOpponentIndex];
+        document.getElementById('next-opponent-sprite').textContent = nextOpponent.sprite;
+        document.getElementById('next-opponent-name').textContent = nextOpponent.name;
+        document.getElementById('next-opponent-type').textContent = nextOpponent.type;
+    }
+    
+    function startTournamentBattle() {
+        startBattle(true);
+    }
+
+    // ========================================
+    // Battle Event System
+    // ========================================
+    
+    function checkBattleEvent() {
+        // 20%の確率でイベント発生 (最初の2ターンは発生しない)
+        if (turnCount < 2 || Math.random() > 0.2) return null;
+        
+        const event = battleEvents[Math.floor(Math.random() * battleEvents.length)];
+        addLog(`\n✨ ${event.name} ✨`, 'text-yellow-400 font-bold');
+        addLog(event.message, 'text-yellow-300');
+        
+        const result = event.effect();
+        return result || {};
+    }
+
+    // ========================================
+    // Battle System
+    // ========================================
+    
+    function startBattle(isTournament = false) {
+        // Start battle music
+        playBattleBGM();
+        
+        // Reset turn count
+        turnCount = 0;
+        
+        // Initialize item
+        playerItem = selectedCharacter.item ? { ...selectedCharacter.item } : null;
+        itemUsed = false;
+        itemEffects = {};
+        
+        // Setup player
+        const char = selectedCharacter;
+        const skills = selectedSkills.map(idx => {
+            const skillId = char.skills[idx];
+            const baseSkill = allSkills.find(s => s.id === skillId);
+            const skill = { ...baseSkill };
+            
+            // キャラ固有の調整を適用
+            if (char.skillMods && char.skillMods[skillId]) {
+                const mods = char.skillMods[skillId];
+                if (mods.power !== undefined) skill.power = mods.power;
+                if (mods.accuracy !== undefined) skill.accuracy = mods.accuracy;
+                if (mods.pp !== undefined) skill.pp = mods.pp;
+            }
+            
+            // トーナメントモードでPP管理
+            if (isTournament && player && player.moveSet) {
+                // 前のバトルのPPを継承
+                const prevSkill = player.moveSet.find(m => m.id === skill.id);
+                if (prevSkill) {
+                    skill.currentPP = prevSkill.currentPP;
+                } else {
+                    skill.currentPP = skill.pp;
+                }
+                
+                // 3戦ごとにPP全回復
+                if (tournamentBattles > 0 && tournamentBattles % 3 === 0) {
+                    skill.currentPP = skill.pp;
+                }
+            } else {
+                skill.currentPP = skill.pp;
+            }
+            
+            return skill;
+        });
+        
+        player = {
+            ...char,
+            maxHp: char.hp,
+            hp: char.hp,
+            moveSet: skills,
+            spriteImg: document.getElementById('player-sprite'),
+            hpBar: document.getElementById('player-hp-bar'),
+            hpText: document.getElementById('player-hp-text')
+        };
+        
+        // Setup enemy
+        let enemyChar;
+        if (gameMode === 'story') {
+            const chapter = storyChapters[currentChapter];
+            enemyChar = charactersData.find(c => c.id === chapter.opponent);
+        } else if (gameMode === 'tournament') {
+            enemyChar = tournamentOpponents[currentOpponentIndex];
+        } else {
+            // Random enemy
+            const availableEnemies = charactersData.filter(c => c.unlocked && c.id !== char.id);
+            if (availableEnemies.length > 0) {
+                enemyChar = availableEnemies[Math.floor(Math.random() * availableEnemies.length)];
+            } else {
+                // If no other unlocked characters, use any unlocked character
+                const anyUnlocked = charactersData.filter(c => c.unlocked);
+                enemyChar = anyUnlocked[Math.floor(Math.random() * anyUnlocked.length)];
+            }
+        }
+        
+        const enemySkills = enemyChar.skills.slice(0, 4).map(skillId => {
+            const baseSkill = allSkills.find(s => s.id === skillId);
+            const skill = { ...baseSkill };
+            
+            // 敵キャラにも調整を適用
+            if (enemyChar.skillMods && enemyChar.skillMods[skillId]) {
+                const mods = enemyChar.skillMods[skillId];
+                if (mods.power !== undefined) skill.power = mods.power;
+                if (mods.accuracy !== undefined) skill.accuracy = mods.accuracy;
+                if (mods.pp !== undefined) skill.pp = mods.pp;
+            }
+            
+            skill.currentPP = skill.pp;
+            return skill;
+        });
+        
+        // Apply difficulty to enemy
+        const adjustedEnemyChar = applyDifficulty(enemyChar);
+        
+        enemy = {
+            ...adjustedEnemyChar,
+            maxHp: adjustedEnemyChar.hp,
+            hp: adjustedEnemyChar.hp,
+            moveSet: enemySkills,
+            spriteImg: document.getElementById('enemy-sprite'),
+            hpBar: document.getElementById('enemy-hp-bar'),
+            hpText: document.getElementById('enemy-hp-text')
+        };
+        
+        // Show battle screen
+        showScreen('battle-screen');
+        document.getElementById('ui-box').classList.remove('hidden-screen');
+        
+        // Reset battle UI
+        document.getElementById('controls').classList.remove('hidden');
+        document.getElementById('result-ctrl').classList.add('hidden');
+        
+        // Setup UI
+        document.getElementById('player-name-display').textContent = player.name;
+        document.getElementById('player-type-display').textContent = player.type;
+        player.spriteImg.textContent = player.sprite;
+        
+        // Display player item
+        const itemDisplay = document.getElementById('player-item-display');
+        if (playerItem) {
+            itemDisplay.textContent = playerItem.name;
+            itemDisplay.className = 'text-amber-400';
+        } else {
+            itemDisplay.textContent = '';
+        }
+        
+        document.getElementById('enemy-name-display').textContent = enemy.name;
+        document.getElementById('enemy-type-display').textContent = enemy.type;
+        enemy.spriteImg.textContent = enemy.sprite;
+        
+        document.getElementById('battle-info').textContent = `${player.name} vs ${enemy.name}`;
+        
+        updateHP(player);
+        updateHP(enemy);
+        updateControls();
+        
+        document.getElementById('log').innerHTML = '';
+        addLog(`${enemy.name} が現れた！`);
+    }
+
+    function updateHP(target) {
+        const p = Math.max(0, (target.hp / target.maxHp) * 100);
+        target.hpBar.style.width = p + '%';
+        target.hpText.textContent = `${Math.ceil(target.hp)} / ${target.maxHp}`;
+        target.hpBar.className = `hp-bar-fill ${p < 25 ? 'danger' : (p < 50 ? 'warning' : '')}`;
+    }
+
+    function addLog(msg, color = 'text-slate-200') {
+        const log = document.getElementById('log');
+        const p = document.createElement('p');
+        p.className = color + " mb-1 border-l-2 border-indigo-500 pl-2";
+        p.textContent = msg;
+        log.appendChild(p);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function updateControls() {
+        const c = document.getElementById('controls');
+        c.innerHTML = '';
+        
+        // アイテムボタン（左上）
+        if (playerItem && !itemUsed) {
+            const itemBtn = document.createElement('button');
+            itemBtn.className = 'action-button col-span-2 bg-gradient-to-r from-amber-600 to-yellow-600 border-amber-400';
+            itemBtn.disabled = isBusy;
+            itemBtn.innerHTML = `
+                <div class="flex justify-between w-full font-bold text-xs">
+                    <span>🎁 ${playerItem.name}</span>
+                    <span class="text-yellow-200">×${playerItem.uses}</span>
+                </div>
+                <div class="text-[9px] text-yellow-100 font-normal leading-tight h-5 overflow-hidden">${playerItem.desc}</div>
+            `;
+            itemBtn.onclick = () => useItem();
+            c.appendChild(itemBtn);
+        }
+        
+        player.moveSet.forEach((m, i) => {
+            const btn = document.createElement('button');
+            const isSpec = m.isSpecial;
+            const isPpOut = m.currentPP <= 0;
+
+            btn.className = `action-button ${isSpec ? 'special-move-btn' : ''}`;
+            btn.disabled = isPpOut || isBusy;
+            
+            btn.innerHTML = `
+                <div class="flex justify-between w-full font-bold text-xs">
+                    <span>${isSpec ? '★' : ''}${m.name}</span>
+                    <span class="${isPpOut ? 'text-rose-500' : 'text-indigo-300'}">PP ${m.currentPP}</span>
+                </div>
+                <div class="text-[9px] text-slate-400 font-normal leading-tight h-5 overflow-hidden">${m.desc}</div>
+                <div class="flex justify-between w-full border-t border-white/5 mt-1.5 pt-1.5 text-[9px] font-black tracking-tighter">
+                    ${m.power > 0 ? `<span class="bg-indigo-500/20 px-1 rounded">威力:${m.power}</span>` : '<span></span>'}
+                    <span class="bg-indigo-500/20 px-1 rounded">命中:${m.accuracy}%</span>
+                </div>
+            `;
+            btn.onclick = () => handleTurn(i);
+            c.appendChild(btn);
+        });
+    }
+
+    async function useItem() {
+        if (!playerItem || itemUsed || isBusy) return;
+        isBusy = true;
+        
+        addLog(`${player.name} は ${playerItem.name} を使った！`, 'text-amber-400 font-bold');
+        itemUsed = true;
+        playerItem.uses--;
+        
+        await new Promise(r => setTimeout(r, 500));
+        
+        // アイテム効果を適用
+        switch(playerItem.id) {
+            case 'poison-wing':
+                addLog(`${enemy.name} は猛毒状態になった！`, 'text-purple-400');
+                itemEffects.enemyPoison = true;
+                break;
+            case 'invisible-cloak':
+                addLog(`${player.name} は姿を消した！`, 'text-cyan-400');
+                itemEffects.playerDodge = true;
+                break;
+            case 'four-arms':
+                const heal1 = Math.floor(player.maxHp * 0.3);
+                player.hp = Math.min(player.maxHp, player.hp + heal1);
+                player.atk = Math.floor(player.atk * 1.4);
+                player.def = Math.floor(player.def * 1.3);
+                updateHP(player);
+                addLog(`${player.name} のHPが回復し、攻撃・防御が上がった！`, 'text-emerald-400');
+                break;
+            case 'decay-swarm':
+                addLog(`${enemy.name} は腐敗状態になった！`, 'text-green-600');
+                itemEffects.enemyDecay = true;
+                enemy.def = Math.floor(enemy.def * 0.8);
+                break;
+            case 'inferno-core':
+                player.atk = Math.floor(player.atk * 1.6);
+                itemEffects.playerFireBoost = true;
+                addLog(`${player.name} の攻撃力が大幅に上がった！`, 'text-orange-400');
+                break;
+            case 'eight-heads':
+                const heal2 = Math.floor(player.maxHp * 0.4);
+                player.hp = Math.min(player.maxHp, player.hp + heal2);
+                player.atk = Math.floor(player.atk * 1.4);
+                updateHP(player);
+                addLog(`${player.name} の八つの頭が覚醒した！`, 'text-green-400');
+                break;
+            case 'storm-call':
+                const thunderDmg = Math.floor(enemy.maxHp * 0.2);
+                enemy.hp = Math.max(0, enemy.hp - thunderDmg);
+                updateHP(enemy);
+                itemEffects.enemyParalyzed = true;
+                addLog(`${enemy.name} に雷ダメージ！麻痺した！`, 'text-yellow-400');
+                break;
+            case 'destiny-tablet':
+                itemEffects.playerCritical = true;
+                addLog(`${player.name} の運命が変わった！次の攻撃が必中急所！`, 'text-pink-400');
+                break;
+            case 'ice-armor':
+                player.def = Math.floor(player.def * 1.8);
+                enemy.atk = Math.floor(enemy.atk * 0.8);
+                const heal3 = Math.floor(player.maxHp * 0.2);
+                player.hp = Math.min(player.maxHp, player.hp + heal3);
+                updateHP(player);
+                addLog(`${player.name} を氷の銭が守る！`, 'text-cyan-400');
+                break;
+            case 'fox-fire':
+                itemEffects.enemyBurn = true;
+                player.atk = Math.floor(player.atk * 1.3);
+                addLog(`${enemy.name} は火傷を負った！`, 'text-orange-400');
+                break;
+            case 'serpent-scale':
+                player.def = Math.floor(player.def * 1.5);
+                itemEffects.playerShield = true;
+                addLog(`${player.name} に蛇鱗の防御壁！`, 'text-teal-400');
+                break;
+            case 'oni-sake':
+                const heal4 = Math.floor(player.maxHp * 0.35);
+                player.hp = Math.min(player.maxHp, player.hp + heal4);
+                player.atk = Math.floor(player.atk * 1.3);
+                player.def = Math.floor(player.def * 1.2);
+                updateHP(player);
+                addLog(`${player.name} が酒で力を取り戻した！`, 'text-red-400');
+                break;
+        }
+        
+        await new Promise(r => setTimeout(r, 800));
+        
+        // 敵のターン
+        if (enemy.hp > 0 && player.hp > 0) {
+            let enemyMove = enemy.moveSet[Math.floor(Math.random() * enemy.moveSet.length)];
+            await executeMove(enemy, player, enemyMove);
+        }
+        
+        // Check end
+        if (player.hp <= 0) {
+            endBattle(false);
+        } else if (enemy.hp <= 0) {
+            endBattle(true);
+        }
+        
+        isBusy = false;
+        updateControls();
+    }
+
+    async function handleTurn(idx) {
+        if (isBusy) return;
+        isBusy = true;
+        
+        turnCount++;
+        
+        const m = player.moveSet[idx];
+        m.currentPP--;
+        updateControls();
+
+        // バトルイベントチェック
+        const eventResult = checkBattleEvent();
+        if (eventResult) {
+            await new Promise(r => setTimeout(r, 1200));
+        }
+
+        await executeMove(player, enemy, m, eventResult?.confusedTurn);
+        
+        if (enemy.hp > 0 && player.hp > 0 && !eventResult?.skipEnemyTurn) {
+            await new Promise(r => setTimeout(r, 800));
+            let enemyMove = enemy.moveSet[Math.floor(Math.random() * enemy.moveSet.length)];
+            await executeMove(enemy, player, enemyMove, eventResult?.confusedTurn);
+        }
+        
+        // 継続ダメージ処理
+        if (enemy.hp > 0 && player.hp > 0) {
+            await new Promise(r => setTimeout(r, 500));
+            
+            if (itemEffects.enemyPoison) {
+                const poisonDmg = Math.floor(enemy.maxHp * 0.08);
+                enemy.hp = Math.max(0, enemy.hp - poisonDmg);
+                updateHP(enemy);
+                addLog(`${enemy.name} は猛毒のダメージを受けた！`, 'text-purple-400');
+            }
+            
+            if (itemEffects.enemyBurn) {
+                const burnDmg = Math.floor(enemy.maxHp * 0.06);
+                enemy.hp = Math.max(0, enemy.hp - burnDmg);
+                updateHP(enemy);
+                addLog(`${enemy.name} は火傷のダメージを受けた！`, 'text-orange-400');
+            }
+            
+            if (itemEffects.enemyDecay) {
+                const decayDmg = Math.floor(enemy.maxHp * 0.07);
+                enemy.hp = Math.max(0, enemy.hp - decayDmg);
+                updateHP(enemy);
+                addLog(`${enemy.name} は腐敗のダメージを受けた！`, 'text-green-600');
+            }
+        }
+
+        // Check end
+        if (player.hp <= 0) {
+            endBattle(false);
+        } else if (enemy.hp <= 0) {
+            endBattle(true);
+        }
+        
+        isBusy = false;
+        updateControls();
+    }
+
+    async function executeMove(atk, def, move, isConfused = false) {
+        addLog(`${atk.name} の ${move.name}！`);
+        
+        // 混乱時は50%で自分にダメージ
+        if (isConfused && Math.random() < 0.5) {
+            addLog(`${atk.name} は混乱している！`, 'text-purple-400');
+            const confusionDamage = Math.floor(atk.maxHp * 0.1);
+            atk.hp = Math.max(0, atk.hp - confusionDamage);
+            updateHP(atk);
+            addLog(`${atk.name} は自分を攻撃してしまった！`, 'text-purple-400');
+            return;
+        }
+        
+        // 隠形マントで回避
+        if (atk === enemy && itemEffects.playerDodge) {
+            addLog(`${player.name} は攻撃を回避した！`, 'text-cyan-400');
+            itemEffects.playerDodge = false;
+            // 反撃ダメージ
+            const counterDmg = Math.floor(enemy.maxHp * 0.15);
+            enemy.hp = Math.max(0, enemy.hp - counterDmg);
+            updateHP(enemy);
+            addLog(`${enemy.name} に反撃ダメージ！`, 'text-cyan-400');
+            return;
+        }
+        
+        // Animation
+        const isPlayer = (atk === player);
+        atk.spriteImg.style.transform = isPlayer ? 'translate(20px, -20px)' : 'translate(-20px, 20px)';
+        await new Promise(r => setTimeout(r, 150));
+        atk.spriteImg.style.transform = '';
+
+        // Heal move
+        if (move.isHeal) {
+            playSound('heal');
+            const heal = Math.floor(atk.maxHp * 0.4);
+            atk.hp = Math.min(atk.maxHp, atk.hp + heal);
+            addLog(`▶ ${atk.name} はHPを回復した！`, 'text-emerald-400');
+            updateHP(atk);
+            return;
+        }
+
+        // Buff move
+        if (move.isBuff) {
+            addLog(`▶ ${atk.name} の防御力が上がった！`, 'text-blue-400');
+            return;
+        }
+
+        // Miss check
+        if (Math.random() * 100 > move.accuracy) { 
+            playSound('miss');
+            addLog("▶ しかし、攻撃ははずれた！", 'text-slate-400'); 
+            return; 
+        }
+
+        // Damage calculation
+        let dmg = Math.floor((move.power * (atk.atk / def.def)) * 0.6 * (0.9 + Math.random() * 0.2));
+        
+        // Critical
+        let isCritical = Math.random() < 0.1;
+        
+        // 運命の盤で必中クリティカル
+        if (atk === player && itemEffects.playerCritical) {
+            isCritical = true;
+            itemEffects.playerCritical = false;
+        }
+        
+        // 炎の核でダメージ2倍
+        if (atk === player && itemEffects.playerFireBoost) {
+            dmg = Math.floor(dmg * 2);
+            itemEffects.playerFireBoost = false;
+            addLog("▶ 炎の核の力が爆発した！", 'text-orange-500');
+        }
+        
+        // 蛇鱗シールドで無効化
+        if (def === player && itemEffects.playerShield) {
+            addLog(`▶ ${player.name} の蛇鱗が攻撃を防いだ！`, 'text-teal-400');
+            itemEffects.playerShield = false;
+            return;
+        }
+        
+        if (isCritical) { 
+            dmg = Math.floor(dmg * 1.5); 
+            playSound('critical');
+            addLog("▶ 急所に当たった！", 'text-rose-400'); 
+        } else {
+            playSound('hit');
+        }
+
+        def.hp = Math.max(0, def.hp - dmg);
+        updateHP(def);
+        
+        def.spriteImg.classList.add('shake');
+        await new Promise(r => setTimeout(r, 400));
+        def.spriteImg.classList.remove('shake');
+    }
+
+    function endBattle(isWin) {
+        stopBGM();
+        document.getElementById('controls').classList.add('hidden');
+        document.getElementById('result-ctrl').classList.remove('hidden');
+        
+        if (isWin) {
+            playVictoryFanfare();
+            document.getElementById('result-text').textContent = '🎉 勝利！';
+            document.getElementById('result-text').className = 'text-2xl font-bold text-emerald-400';
+            addLog(`${enemy.name} を倒した！`, 'text-emerald-400');
+        } else {
+            document.getElementById('result-text').textContent = '💀 敗北...';
+            document.getElementById('result-text').className = 'text-2xl font-bold text-rose-400';
+            addLog(`${player.name} は倒れた...`, 'text-rose-400');
+        }
+    }
+
+    function afterBattle() {
+        const isWin = player.hp > 0;
+        
+        if (gameMode === 'story' && isWin) {
+            showStoryContinueScreen();
+        } else if (gameMode === 'tournament') {
+            if (isWin) {
+                tournamentWins++;
+                tournamentBattles++;
+                currentOpponentIndex++;
+                
+                // HP全回復
+                player.hp = player.maxHp;
+                
+                if (currentOpponentIndex >= tournamentOpponents.length) {
+                    // トーナメント制覇！
+                    setTimeout(() => {
+                        alert(`🏆 トーナメント制覇！\n${tournamentWins}連勝達成！`);
+                        backToTitle();
+                    }, 500);
+                } else {
+                    // 次の対戦へ
+                    showTournamentScreen();
+                }
+            } else {
+                // 敗北
+                setTimeout(() => {
+                    alert(`敗北...\n最終成績: ${tournamentWins}勝`);
+                    backToTitle();
+                }, 500);
+            }
+        } else {
+            backToTitle();
+        }
+    }
+
+    // ========================================
+    // Initialize
+    // ========================================
+    
+    window.onload = () => {
+        loadProgress();
+        initAudio();
+        playTitleBGM();
+    };
+</script>
+</body>
+</html>
