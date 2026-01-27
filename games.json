@@ -17,6 +17,15 @@
       "image": "",
       "url": "games/pokemon-nazonazo/index.html",
       "tags": ["クイズ", "シングルプレイ", "ポケモン"]
+    },
+    {
+      "id": "pokemon-find-name",
+      "title": "ポケなぞ！",
+      "description": "グリッド内のポケモンの名前を探し出す、楽しい文字探しゲーム！制限時間内にたくさんのポケモンを見つけて、でんせつのポケモンをコレクトしよう！",
+      "icon": "✨",
+      "image": "",
+      "url": "games/pokemon-find-name/index.html",
+      "tags": ["パズル", "シングルプレイ", "ポケモン"]
     }
   ]
 }
