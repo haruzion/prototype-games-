@@ -2,6 +2,8 @@
 
 ブラウザゲームのコレクションサイト
 
+🌐 **Live Site**: https://haruzion.github.io/prototype-games-/
+
 ## 特徴
 
 - 📱 モバイルフレンドリーなレスポンシブデザイン
