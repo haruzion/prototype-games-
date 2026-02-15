@@ -352,6 +352,7 @@
                 <button onclick="closeQuitModal()" class="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold">いいえ</button>
                 <button onclick="backToTitle()" class="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold">はい</button>
             </div>
+            <button onclick="backToMainMenu()" class="mt-4 w-full py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold rounded-xl transition">🏠 メインメニューへ</button>
         </div>
     </div>
 
@@ -368,6 +369,7 @@
                 <span class="text-[10px] font-normal opacity-80 italic">2 vs 2 Battle</span>
             </button>
         </div>
+        <button onclick="backToMainMenu()" class="mt-8 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition text-sm">🏠 メインメニューへ</button>
     </div>
 
     <!-- 2. Difficulty Screen -->
@@ -1260,6 +1262,13 @@
                                   (def === enemy) ? 'enemy-item-display' : 'enemy2-item-display';
             document.getElementById(itemDisplayId).textContent = "";
         }
+    }
+
+    function backToMainMenu() {
+        sound.playSe('select');
+        setTimeout(() => {
+            window.location.href = '../../index.html';
+        }, 100);
     }
 </script>
 </body>

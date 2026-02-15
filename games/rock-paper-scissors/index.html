@@ -200,12 +200,14 @@
             </div>
         </div>
 
-        <button onclick="showCharSelect()" class="btn-main">GAME START</button>
+        <button onclick="showCharSelect()" class="btn-main mb-4">GAME START</button>
+        <button onclick="backToMainMenu()" class="px-6 py-3 bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold rounded-2xl transition text-sm">🏠 メインメニューへ</button>
     </div>
 
     <!-- Character Selection Screen -->
     <div id="char-select-screen" class="screen hidden">
         <button onclick="backToTitle()" class="absolute top-6 left-6 bg-slate-200 text-slate-600 px-5 py-2 rounded-xl font-black text-sm">タイトルに戻る</button>
+        <button onclick="backToMainMenu()" class="absolute top-6 right-6 bg-slate-600 hover:bg-slate-500 text-white px-5 py-2 rounded-xl font-black text-sm transition">🏠 メニュー</button>
         <h1 class="text-3xl font-black text-slate-800 mb-10 tracking-tighter italic">CHOOSE YOUR ANIMAL!</h1>
         <div class="char-grid mb-10" id="char-list"></div>
         
@@ -719,6 +721,13 @@
                 btn.disabled = skillUsed;
                 btn.style.opacity = skillUsed ? "0.3" : "1";
             }
+        }
+
+        function backToMainMenu() {
+            soundDecide();
+            setTimeout(() => {
+                window.location.href = '../../index.html';
+            }, 200);
         }
     </script>
 </body>
