@@ -248,9 +248,10 @@
             <h1 class="text-5xl font-black text-amber-500 italic mb-2">POKÉ NAZO</h1>
             <p class="text-amber-400 font-bold mb-10">でんせつの ポケモンを あつめよう！</p>
         </div>
-        <button onclick="Game.init()" class="w-full max-w-xs bg-sky-400 text-white text-2xl font-black py-6 rounded-[2.5rem] shadow-[0_10px_0_#0284c7] active:translate-y-2 transition-all">
+        <button onclick="Game.init()" class="w-full max-w-xs bg-sky-400 text-white text-2xl font-black py-6 rounded-[2.5rem] shadow-[0_10px_0_#0284c7] active:translate-y-2 transition-all mb-4">
             スタート！
         </button>
+        <button onclick="backToMainMenu()" class="w-full max-w-xs bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 rounded-full transition">🏠 メインメニューへ</button>
     </div>
 
     <div id="result-screen" class="screen">
@@ -266,7 +267,8 @@
             </div>
         </div>
         <button onclick="Game.init()" class="w-full max-w-xs bg-sky-400 text-white text-xl font-black py-5 rounded-3xl shadow-[0_8px_0_#0284c7] mb-4">もういっかい！</button>
-        <button onclick="UI.openPokedex()" class="text-sky-400 font-bold">ずかんを みる</button>
+        <button onclick="UI.openPokedex()" class="text-sky-400 font-bold mb-4">ずかんを みる</button>
+        <button onclick="backToMainMenu()" class="w-full max-w-xs bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 rounded-full transition text-sm">🏠 メインメニューへ</button>
     </div>
 
     <div id="pokedex-screen" class="screen">
@@ -645,6 +647,13 @@
         }
 
         window.onload = setupEvents;
+
+        function backToMainMenu() {
+            AudioEngine.playSuccess(false);
+            setTimeout(() => {
+                window.location.href = '../../index.html';
+            }, 300);
+        }
     </script>
 </body>
 </html>
